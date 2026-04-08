@@ -1891,11 +1891,56 @@ function renderDash(){
     <div class="wc be-c"><div class="wn">${be}</div><div class="wl">Break-even</div></div>
   `;
   if(cWlb) cWlb.destroy();
-  if(all.length){ cWlb = new Chart(document.getElementById('c-wlb'),{
-    type:'doughnut',
-    data:{labels:['Winnaars','Verliezers','Break-even'],datasets:[{data:[wins,losses,be],backgroundColor:['rgba(16,185,129,.8)','rgba(244,63,94,.8)','rgba(100,116,139,.35)'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'68%'}
-  }); document.getElementById('c-wlb')._chart=cWlb; }
+  if(all.length){
+    const wr  = all.length ? Math.round(wins/all.length*100) : 0;
+    const lrp = all.length ? Math.round(losses/all.length*100) : 0;
+    const bep = 100-wr-lrp;
+    // Plugin to draw percentage in center
+    const centerTextPlugin = {
+      id:'centerText',
+      afterDraw(chart){
+        const {ctx, chartArea:{width,height,top}} = chart;
+        ctx.save();
+        const cx = width/2, cy = top + height/2;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillStyle='#f1f5f9'; ctx.font='bold 22px system-ui,sans-serif';
+        ctx.fillText(wr+'%', cx, cy-9);
+        ctx.fillStyle='#64748b'; ctx.font='11px system-ui,sans-serif';
+        ctx.fillText('winrate', cx, cy+12);
+        ctx.restore();
+      }
+    };
+    cWlb = new Chart(document.getElementById('c-wlb'),{
+      type:'doughnut',
+      data:{
+        labels:['Winnaars ('+wr+'%)','Verliezers ('+lrp+'%)','Break-even ('+bep+'%)'],
+        datasets:[{
+          data:[wins,losses,be],
+          backgroundColor:['rgba(16,185,129,.85)','rgba(244,63,94,.85)','rgba(100,116,139,.35)'],
+          borderWidth:0
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{
+            display:true,
+            position:'bottom',
+            labels:{color:'#94a3b8',font:{size:11},padding:12,usePointStyle:true}
+          },
+          tooltip:{callbacks:{
+            label:ctx=>{
+              const pct=[wr,lrp,bep][ctx.dataIndex];
+              return ' '+ctx.label.split(' (')[0]+': '+ctx.parsed+' ('+pct+'%)';
+            }
+          }}
+        },
+        cutout:'65%'
+      },
+      plugins:[centerTextPlugin]
+    });
+    document.getElementById('c-wlb')._chart=cWlb;
+  }
 
   renderEquity(sorted);
   renderStratChart(all);
@@ -2322,21 +2367,60 @@ function openTickerPopup(tk){
 
 function renderEmoChart(all){
   const el = document.getElementById('emo-chart');
-  el.innerHTML = EMOS.map(e=>{
+
+  const rows = EMOS.map(e=>{
     const ts = all.filter(t=>(t.emos||[]).includes(e));
-    const w = ts.filter(t=>+t.pnl>0).length;
-    const l = ts.filter(t=>+t.pnl<0).length;
+    const w   = ts.filter(t=>+t.pnl>0).length;
+    const l   = ts.filter(t=>+t.pnl<0).length;
     const tot = w+l;
-    if(!tot) return '';
-    const wp = tot?Math.round(w/tot*100):0;
-    return `<div class="ec-item">
-      <div class="ec-name">${ESHORT[e]} (${tot}×)</div>
-      <div class="ec-bars">
-        <div class="sc-green" style="width:${wp}%">${wp>=15?wp+'%':''}</div>
-        <div class="sc-red" style="width:${100-wp}%">${(100-wp)>=15?(100-wp)+'%':''}</div>
+    if(!tot) return null;
+    const wp  = Math.round(w/tot*100);
+    const lp  = 100-wp;
+
+    // Gemiste RU: per trade het verschil tussen beste backtest en werkelijke RU
+    // Als geen backtest: tel de verlies-RU van die trades op als indicatie
+    let missedRU = 0;
+    ts.forEach(t=>{
+      const actual = +t.ru||0;
+      const btVals = Object.values(t.bt||{}).filter(v=>typeof v==='number');
+      if(btVals.length){
+        const best = Math.max(...btVals);
+        if(best > actual) missedRU += Math.round((best-actual)*100)/100;
+      } else if(actual < 0){
+        // Geen backtest: verlies-trades tellen als gemiste RU
+        missedRU += Math.abs(actual);
+      }
+    });
+    missedRU = Math.round(missedRU*100)/100;
+
+    return {e, tot, wp, lp, missedRU};
+  }).filter(Boolean);
+
+  if(!rows.length){ el.innerHTML='<div class="empty" style="padding:1rem">Geen data.</div>'; return; }
+
+  // Header
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;padding:0 0 6px;border-bottom:.5px solid var(--border);margin-bottom:6px">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Emotie / gedrag</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;text-align:right;min-width:80px">Winst/verlies</div>
+      <div style="font-size:10px;color:var(--amber);text-transform:uppercase;letter-spacing:.05em;text-align:right;min-width:72px">Gemiste RU</div>
+    </div>` +
+    rows.map(({e, tot, wp, lp, missedRU})=>`
+    <div class="ec-item" style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;margin-bottom:8px">
+      <div>
+        <div class="ec-name" style="margin-bottom:3px">${ESHORT[e]} <span style="color:var(--text3);font-size:10px">(${tot}×)</span></div>
+        <div class="ec-bars" style="margin:0">
+          <div class="sc-green" style="width:${wp}%">${wp>=15?wp+'%':''}</div>
+          <div class="sc-red" style="width:${lp}%">${lp>=15?lp+'%':''}</div>
+        </div>
       </div>
-    </div>`;
-  }).filter(Boolean).join('') || '<div class="empty" style="padding:1rem">Geen data.</div>';
+      <div style="font-size:11px;text-align:right;min-width:80px;color:var(--text3)">
+        <span style="color:var(--green)">${wp}%</span> / <span style="color:var(--red)">${lp}%</span>
+      </div>
+      <div style="font-size:12px;font-weight:700;text-align:right;min-width:72px;color:${missedRU>0?'var(--amber)':'var(--text3)'}">
+        ${missedRU>0?'+'+fmt(missedRU,1)+'R':'—'}
+      </div>
+    </div>`).join('');
 }
 
 function renderPlanCompare(all){
