@@ -1631,6 +1631,7 @@ function openImgViewer(idx){
   if(!viewerImages.length) return;
   viewerIdx = idx;
   const img = document.getElementById('img-viewer-img');
+  img.crossOrigin = 'anonymous';
   img.src = viewerImages[viewerIdx];
   img.onload = () => ivSyncCanvas();
   ivReset();
@@ -1786,54 +1787,103 @@ function ivSaveDrawing(){
   const img = document.getElementById('img-viewer-img');
   const cv  = document.getElementById('iv-canvas');
 
-  // Check if there's anything drawn
-  const ctx = cv.getContext('2d');
-  const blank = document.createElement('canvas');
-  blank.width=cv.width; blank.height=cv.height;
-  if(cv.toDataURL()===blank.toDataURL()){
+  // Check if anything is drawn
+  const blankCv = document.createElement('canvas');
+  blankCv.width=cv.width; blankCv.height=cv.height;
+  if(cv.toDataURL()===blankCv.toDataURL()){
     showSyncStatus('⚠️ Niets getekend om op te slaan');
     setTimeout(()=>showSyncStatus(''),2000);
     return;
   }
 
-  // Merge image + drawing onto a new canvas at natural resolution
-  const out = document.createElement('canvas');
-  out.width  = img.naturalWidth;
-  out.height = img.naturalHeight;
-  const outCtx = out.getContext('2d');
-  outCtx.drawImage(img, 0, 0);
-  // Scale drawing coords to match natural image size
-  const scaleX = img.naturalWidth  / cv.width;
-  const scaleY = img.naturalHeight / cv.height;
-  outCtx.save();
-  outCtx.scale(scaleX, scaleY);
-  outCtx.drawImage(cv, 0, 0);
-  outCtx.restore();
-  const dataUrl = out.toDataURL('image/jpeg', 0.92);
+  showSyncStatus('⏳ Tekening verwerken...');
 
-  // Remember the original URL before replacing
+  // Remember original URL before any changes
   const origUrl = viewerImages[viewerIdx];
-  viewerImages[viewerIdx] = dataUrl;
 
-  // Find and update in trades
-  let saved = false;
-  trades.forEach(t=>{
-    if(!t.images) return;
-    const i = t.images.indexOf(origUrl);
-    if(i>=0){
-      t.images[i] = dataUrl;
-      dbSaveTrade(t).catch(e=>console.error('Save error:',e));
-      saved = true;
+  // Load image fresh with crossOrigin to avoid tainted canvas (CORS)
+  const freshImg = new Image();
+  freshImg.crossOrigin = 'anonymous';
+  freshImg.onload = function(){
+    try {
+      const out = document.createElement('canvas');
+      out.width  = freshImg.naturalWidth  || freshImg.width;
+      out.height = freshImg.naturalHeight || freshImg.height;
+      const outCtx = out.getContext('2d');
+
+      // Draw original image
+      outCtx.drawImage(freshImg, 0, 0);
+
+      // Scale and overlay the drawing canvas
+      const scaleX = out.width  / cv.width;
+      const scaleY = out.height / cv.height;
+      outCtx.save();
+      outCtx.scale(scaleX, scaleY);
+      outCtx.drawImage(cv, 0, 0);
+      outCtx.restore();
+
+      const dataUrl = out.toDataURL('image/jpeg', 0.92);
+
+      // Update viewerImages
+      viewerImages[viewerIdx] = dataUrl;
+
+      // Find trade and update
+      let saved = false;
+      trades.forEach(t=>{
+        if(!t.images) return;
+        const i = t.images.indexOf(origUrl);
+        if(i>=0){
+          t.images[i] = dataUrl;
+          dbSaveTrade(t).catch(e=>console.error('Save error:',e));
+          saved = true;
+        }
+      });
+
+      // Update displayed image and clear canvas
+      img.src = dataUrl;
+      ivClearCanvas();
+      ivUndoStack = [];
+
+      showSyncStatus(saved ? '✓ Tekening opgeslagen in Supabase' : '✓ Tekening opgeslagen');
+      setTimeout(()=>showSyncStatus(''), 2500);
+    } catch(err){
+      console.error('Canvas save error:', err);
+      // Fallback: save drawing canvas only as overlay (base64)
+      ivSaveDrawingFallback(img, cv, origUrl);
     }
-  });
+  };
+  freshImg.onerror = function(){
+    // Direct fallback if CORS fails completely
+    ivSaveDrawingFallback(img, cv, origUrl);
+  };
+  // Add cache-busting to force re-fetch with CORS headers
+  freshImg.src = origUrl + (origUrl.includes('?')?'&':'?') + 'cb=' + Date.now();
+}
 
-  // Update displayed image and clear canvas
-  img.src = dataUrl;
-  ivClearCanvas();
-  ivUndoStack = [];
-
-  showSyncStatus(saved ? '✓ Tekening opgeslagen in Supabase' : '✓ Tekening opgeslagen (lokaal)');
-  setTimeout(()=>showSyncStatus(''), 2500);
+function ivSaveDrawingFallback(img, cv, origUrl){
+  // Fallback: merge using the already-loaded img (may be tainted, but worth trying)
+  try {
+    const out = document.createElement('canvas');
+    out.width = cv.width; out.height = cv.height;
+    const ctx = out.getContext('2d');
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    ctx.drawImage(cv, 0, 0);
+    const dataUrl = out.toDataURL('image/jpeg', 0.92);
+    viewerImages[viewerIdx] = dataUrl;
+    trades.forEach(t=>{
+      if(!t.images) return;
+      const i = t.images.indexOf(origUrl);
+      if(i>=0){ t.images[i]=dataUrl; dbSaveTrade(t).catch(()=>{}); }
+    });
+    img.src = dataUrl;
+    ivClearCanvas(); ivUndoStack=[];
+    showSyncStatus('✓ Tekening opgeslagen');
+    setTimeout(()=>showSyncStatus(''),2500);
+  } catch(e){
+    showSyncStatus('⚠️ Opslaan mislukt (CORS). Probeer Supabase Storage CORS in te stellen.');
+    setTimeout(()=>showSyncStatus(''),4000);
+    console.error('Fallback also failed:', e);
+  }
 }
 
 function ivSetupEvents(){
