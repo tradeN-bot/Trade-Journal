@@ -218,13 +218,13 @@ input[type=range]{accent-color:var(--green);width:100%}
 .plan-box-title{font-size:11px;font-weight:600;margin-bottom:6px}
 
 /* TRADE DETAIL POPUP */
-.trade-detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:250;display:flex;align-items:center;justify-content:center;padding:16px}
-.trade-detail-box{background:var(--bg2);border-radius:var(--r);width:100%;max-width:560px;max-height:92vh;overflow-y:auto;border:.5px solid var(--border2)}
-.td-header{padding:16px 18px 12px;border-bottom:.5px solid var(--border);display:flex;align-items:flex-start;gap:12px}
+.trade-detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:250;display:flex;align-items:center;justify-content:center;padding:12px}
+.trade-detail-box{background:var(--bg2);border-radius:var(--r);width:100%;max-width:900px;height:90vh;display:flex;flex-direction:column;border:.5px solid var(--border2);overflow:hidden}
+.td-header{padding:14px 18px 12px;border-bottom:.5px solid var(--border);display:flex;align-items:flex-start;gap:12px;flex-shrink:0;background:var(--bg2)}
 .td-ticker{font-size:24px;font-weight:700;line-height:1}
 .td-meta{flex:1}
-.td-body{padding:14px 18px}
-.td-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.td-body{padding:14px 18px;overflow-y:auto;flex:1}
+.td-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
 .td-cell{background:var(--bg3);border-radius:var(--rsm);padding:9px 11px}
 .td-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
 .td-value{font-size:14px;font-weight:600}
@@ -569,7 +569,14 @@ input[type=range]{accent-color:var(--green);width:100%}
         <div style="font-size:12px;color:var(--text3);margin-top:3px" id="td-date"></div>
       </div>
       <div class="td-meta" id="td-pills"></div>
-      <button class="modal-close" onclick="closeTradeDetail()" style="align-self:flex-start">&#215;</button>
+      <!-- Navigation + new tab -->
+      <div style="display:flex;align-items:center;gap:6px;align-self:flex-start">
+        <button onclick="navTradeDetail(-1)" title="Vorige trade" style="background:none;border:.5px solid var(--border2);color:var(--text2);border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">&#8249;</button>
+        <span id="td-nav-label" style="font-size:10px;color:var(--text3);min-width:30px;text-align:center"></span>
+        <button onclick="navTradeDetail(1)" title="Volgende trade" style="background:none;border:.5px solid var(--border2);color:var(--text2);border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">&#8250;</button>
+        <button onclick="tdOpenNewTab()" title="Openen in nieuw tabblad" style="background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:4px;padding:0 8px;height:28px;cursor:pointer;font-size:11px">&#8599;</button>
+        <button class="modal-close" onclick="closeTradeDetail()" style="align-self:auto">&#215;</button>
+      </div>
     </div>
     <div class="td-body">
       <div class="td-grid" id="td-grid"></div>
@@ -577,7 +584,7 @@ input[type=range]{accent-color:var(--green);width:100%}
       <div id="td-notes-wrap"></div>
       <div id="td-imgs-wrap"></div>
     </div>
-    <div style="padding:10px 18px 14px;display:flex;gap:8px;border-top:.5px solid var(--border)">
+    <div style="padding:10px 18px 14px;display:flex;gap:8px;border-top:.5px solid var(--border);flex-shrink:0;background:var(--bg2)">
       <button class="icon-btn" id="td-edit-btn" style="font-size:13px;padding:7px 14px;border:.5px solid var(--border2);border-radius:var(--rsm);flex:1">&#9998; Bewerken</button>
       <button class="icon-btn" id="td-bt-btn" style="font-size:13px;padding:7px 14px;border:.5px solid var(--border2);border-radius:var(--rsm);flex:1">&#128202; Backtest</button>
     </div>
@@ -1503,12 +1510,17 @@ function renderLog(){
   const ru = list.reduce((s,t)=>s+(+t.ru||0),0);
   const pnl = list.reduce((s,t)=>s+(+t.pnl||0),0);
   const avgR = avg(list.filter(t=>t.stars>0).map(t=>t.stars));
+  const winPnlLog  = list.filter(t=>+t.pnl>0).reduce((s,t)=>s+(+t.pnl||0),0);
+  const lossPnlLog = list.filter(t=>+t.pnl<0).reduce((s,t)=>s+Math.abs(+t.pnl||0),0);
+  const pfLog = lossPnlLog>0 ? fmt(winPnlLog/lossPnlLog,2) : (winPnlLog>0?'∞':'-');
+  const pfLogColor = lossPnlLog>0?(winPnlLog/lossPnlLog>=1?'pos':'neg'):'';
   document.getElementById('log-kpis').innerHTML = `
     <div class="m"><div class="ml">Trades</div><div class="mv">${list.length}</div></div>
     <div class="m"><div class="ml">Winrate</div><div class="mv ${wr>=50?'pos':'neg'}">${wr}%</div><div class="ms">${wins} winst</div></div>
     <div class="m"><div class="ml">Totaal RU</div><div class="mv ${ru>=0?'pos':'neg'}">${fmtR(ru)}</div></div>
     <div class="m"><div class="ml">Totaal P&L</div><div class="mv ${pnl>=0?'pos':'neg'}">${fmtU(pnl)}</div></div>
     <div class="m"><div class="ml">Gem. rating ★</div><div class="mv">${avgR>0?fmt(avgR,1):'-'}</div><div class="ms">/ 5 sterren</div></div>
+    <div class="m"><div class="ml">Profit factor</div><div class="mv ${pfLogColor}">${pfLog}</div><div class="ms">winst/verlies</div></div>
   `;
   document.getElementById('hdr-count').textContent = trades.length+' trades';
 }
@@ -1518,13 +1530,98 @@ function renderLog(){
 // ============================================================
 let viewerImages = [];
 let viewerIdx = 0;
+let tdCurrentIdx = -1; // current trade index in detail popup
+
+function navTradeDetail(dir){
+  const list = getFilteredLogTrades();
+  if(!list.length) return;
+  const currentPos = list.indexOf(trades[tdCurrentIdx]);
+  let newPos = (currentPos + dir + list.length) % list.length;
+  const newTrade = list[newPos];
+  const newIdx = trades.indexOf(newTrade);
+  openTradeDetail(newIdx);
+}
+
+function tdOpenNewTab(){
+  const t = trades[tdCurrentIdx];
+  if(!t) return;
+  const pnl = +t.pnl||0;
+  const ru  = +t.ru||0;
+  const pnlC = pnl>0?'#10b981':pnl<0?'#ef4444':'#94a3b8';
+  const ruC  = ru>0?'#10b981':ru<0?'#ef4444':'#94a3b8';
+  const imgs = (t.images||[]).map((src,i)=>`<div style="margin-bottom:8px;position:relative;display:inline-block;margin-right:8px"><img src="${src}" style="max-height:300px;max-width:100%;border-radius:6px;display:block"></div>`).join('');
+  const emos = (t.emos||[]).map(e=>`<span style="background:#1e293b;border-radius:20px;padding:3px 10px;font-size:12px;margin:2px;display:inline-block">${e}</span>`).join('');
+  const btRows = Object.entries(t.bt||{}).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a)
+    .map(([ex,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1e293b;font-size:13px"><span style="color:#94a3b8">${ex}</span><span style="font-weight:700;color:${v>=0?'#10b981':'#ef4444'}">${v>=0?'+':''}${v.toFixed(2)}R</span></div>`).join('');
+
+  const html = `<!DOCTYPE html><html><head><title>${t.ticker} · ${t.date} — Trade Journal</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#0f172a;color:#f1f5f9;font-family:system-ui,sans-serif;padding:24px;max-width:900px;margin:0 auto}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+    .card{background:#1e293b;border-radius:8px;padding:12px}
+    .lbl{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+    .val{font-size:18px;font-weight:700}
+    h1{margin:0 0 4px;font-size:28px}
+    .sub{color:#64748b;font-size:13px;margin-bottom:20px}
+    textarea{width:100%;background:#1e293b;color:#f1f5f9;border:.5px solid #334155;border-radius:8px;padding:10px;font-size:13px;font-family:inherit;min-height:100px;resize:vertical}
+    .btn{background:#10b981;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;font-weight:600}
+    .btn:hover{background:#059669}
+    .section{margin-bottom:20px}
+    .section-title{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+    @media(max-width:600px){.grid{grid-template-columns:1fr 1fr}}
+  </style></head><body>
+  <h1>${t.ticker}</h1>
+  <div class="sub">${t.date}${t.time?' · '+t.time:''} · ${t.dir} · ${t.isPaper?'📄 Paper':'Live'} · ${t.strat||''}</div>
+  <div class="grid">
+    <div class="card"><div class="lbl">P&L</div><div class="val" style="color:${pnlC}">${pnl>=0?'+':''}$${Math.abs(pnl).toFixed(2)}</div></div>
+    <div class="card"><div class="lbl">Riskunits</div><div class="val" style="color:${ruC}">${ru>=0?'+':''}${ru.toFixed(2)}R</div></div>
+    <div class="card"><div class="lbl">Plan gevolgd</div><div class="val" style="font-size:14px">${t.plan}</div></div>
+    <div class="card"><div class="lbl">Beoordeling</div><div class="val" style="color:#f59e0b">${'★'.repeat(t.stars||0)}${'☆'.repeat(5-(t.stars||0))}</div></div>
+  </div>
+  ${emos?`<div class="section"><div class="section-title">Emotie / gedrag</div><div>${emos}</div></div>`:''}
+  ${btRows?`<div class="section"><div class="section-title">Backtest resultaten</div>${btRows}</div>`:''}
+  <div class="section">
+    <div class="section-title">Opmerkingen</div>
+    <p style="font-size:13px;color:#94a3b8;margin:0 0 8px">Dit venster is alleen ter inzage. Bewerken doe je in de hoofdapp.</p>
+    <div style="background:#1e293b;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;white-space:pre-wrap;min-height:60px">${t.notes||'<span style="color:#64748b">Geen opmerkingen.</span>'}</div>
+  </div>
+  ${imgs?`<div class="section"><div class="section-title">Afbeeldingen</div>${imgs}</div>`:''}
+  <div style="margin-top:24px;padding-top:16px;border-top:1px solid #1e293b;font-size:12px;color:#64748b;text-align:center">
+    Trade Journal — Lees-alleen weergave · Sluit dit venster om terug te gaan
+  </div>
+  </body></html>`;
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+function tdDeleteImg(tradeIdx, imgIdx){
+  const t = trades[tradeIdx];
+  if(!t||!t.images) return;
+  const isDrawn = imgIdx > 0;
+  const msg = isDrawn ? 'Verwijder deze tekening?' : 'Verwijder dit origineel? Dit kan niet ongedaan worden.';
+  if(!confirm(msg)) return;
+  t.images.splice(imgIdx, 1);
+  dbSaveTrade(t).catch(e=>console.error(e));
+  // Refresh popup
+  openTradeDetail(tradeIdx, false);
+}
 
 function openTradeDetail(idx, scrollToImg){
+  tdCurrentIdx = idx;
   const t = trades[idx];
   const pnl = +t.pnl||0;
   const ru  = +t.ru||0;
   const pnlColor = pnl>0?'var(--green)':pnl<0?'var(--red)':'var(--text2)';
   const ruColor  = ru>0?'var(--green)':ru<0?'var(--red)':'var(--text2)';
+
+  // Update nav label
+  const list = getFilteredLogTrades();
+  const pos = list.indexOf(t);
+  const lbl = document.getElementById('td-nav-label');
+  if(lbl) lbl.textContent = (pos>=0 ? (pos+1)+'/'+list.length : '');
 
   document.getElementById('td-ticker').textContent = t.ticker;
   document.getElementById('td-date').textContent   = t.date + (t.time?' · '+t.time:'');
@@ -1532,13 +1629,22 @@ function openTradeDetail(idx, scrollToImg){
     `<span class="pill ${t.dir==='Long'?'pl':'ps'}" style="margin-right:4px">${t.dir==='Long'?'↑':'↓'} ${t.dir}</span>`+
     (t.isPaper?'<span class="pill pp">📄 Paper</span>':'<span class="pill" style="background:var(--bg3);color:var(--text3)">Live</span>');
 
+  // Backtest samenvatting
+  const btEntries = Object.entries(t.bt||{}).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a);
+  const bestBt = btEntries.length ? btEntries[0] : null;
+
   document.getElementById('td-grid').innerHTML = `
-    <div class="td-cell"><div class="td-label">Strategie</div><div class="td-value" style="font-size:12px">${t.strat||'-'}</div></div>
+    <div class="td-cell"><div class="td-label">Strategie</div><div class="td-value" style="font-size:13px">${t.strat||'-'}</div></div>
     <div class="td-cell"><div class="td-label">Plan gevolgd</div><div class="td-value"><span class="pill ${t.plan==='Ja'?'py':'pn'}">${t.plan==='Ja'?'✓':'✗'} ${t.plan}</span></div></div>
-    <div class="td-cell"><div class="td-label">P&L</div><div class="td-value" style="color:${pnlColor}">$${fmt(pnl)}</div></div>
-    <div class="td-cell"><div class="td-label">Riskunits</div><div class="td-value" style="color:${ruColor}">${ru>=0?'+':''}${fmt(ru)}R</div></div>
-    <div class="td-cell"><div class="td-label">Beoordeling</div><div class="td-value" style="color:var(--amber)">${stars5(t.stars||0)}</div></div>
-    <div class="td-cell"><div class="td-label">Trades type</div><div class="td-value" style="font-size:12px">${t.isPaper?'Papertrade':'Live trade'}</div></div>
+    <div class="td-cell"><div class="td-label">Type</div><div class="td-value" style="font-size:13px">${t.isPaper?'📄 Paper':'Live'} · ${t.dir==='Long'?'↑':'↓'} ${t.dir}</div></div>
+    <div class="td-cell"><div class="td-label">P&L</div><div class="td-value" style="color:${pnlColor};font-size:18px">$${fmt(pnl)}</div></div>
+    <div class="td-cell"><div class="td-label">Riskunits</div><div class="td-value" style="color:${ruColor};font-size:18px">${ru>=0?'+':''}${fmt(ru)}R</div></div>
+    <div class="td-cell"><div class="td-label">Beoordeling</div><div class="td-value" style="color:var(--amber);font-size:16px">${stars5(t.stars||0)}</div></div>
+    <div class="td-cell"><div class="td-label">Datum</div><div class="td-value" style="font-size:13px">${t.date}</div></div>
+    <div class="td-cell"><div class="td-label">Tijdstip</div><div class="td-value" style="font-size:13px">${t.time||'-'}</div></div>
+    <div class="td-cell"><div class="td-label">Best backtest</div><div class="td-value" style="font-size:13px;color:${bestBt?(+bestBt[1]>=0?'var(--green)':'var(--red)'):'var(--text3)'}">
+      ${bestBt ? bestBt[0]+': '+(+bestBt[1]>=0?'+':'')+fmt(+bestBt[1],2)+'R' : '—'}
+    </div></div>
   `;
 
   // Emotions
@@ -1569,9 +1675,16 @@ function openTradeDetail(idx, scrollToImg){
   let imgsHtml = '';
   if(allImgs.length){
     imgsHtml += `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Afbeeldingen (${allImgs.length})</div>`;
-    imgsHtml += `<div class="td-imgs">${allImgs.map((src,i)=>
-      `<img class="td-img-thumb" src="${src}" onclick="openImgViewer(${i})" title="Vergroot">`
-    ).join('')}</div>`;
+    const tradeIdx = trades.indexOf(t);
+    imgsHtml += `<div class="td-imgs">${allImgs.map((src,i)=>{
+      const isDrawn = i>0;
+      const btnColor = isDrawn ? 'var(--red)' : '#64748b';
+      const btnTitle = isDrawn ? 'Verwijder tekening' : 'Verwijder origineel';
+      return `<div style="position:relative;display:inline-block">
+        <img class="td-img-thumb" src="${src}" onclick="openImgViewer(${i})" title="${isDrawn?'Tekening':'Origineel'} — klik om te vergroten">
+        <button onclick="event.stopPropagation();tdDeleteImg(${tradeIdx},${i})" style="position:absolute;top:-5px;right:-5px;background:${btnColor};color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;z-index:2" title="${btnTitle}">×</button>
+      </div>`;
+    }).join('')}</div>`;
   }
   if(t.link){
     imgsHtml += `<div style="margin-top:${allImgs.length?'10px':'0'}">
@@ -1797,92 +1910,108 @@ function ivSaveDrawing(){
   }
 
   showSyncStatus('⏳ Tekening verwerken...');
-
-  // Remember original URL before any changes
   const origUrl = viewerImages[viewerIdx];
 
-  // Load image fresh with crossOrigin to avoid tainted canvas (CORS)
   const freshImg = new Image();
   freshImg.crossOrigin = 'anonymous';
   freshImg.onload = function(){
     try {
       const out = document.createElement('canvas');
-      out.width  = freshImg.naturalWidth  || freshImg.width;
-      out.height = freshImg.naturalHeight || freshImg.height;
+      out.width  = freshImg.naturalWidth  || freshImg.width  || cv.width;
+      out.height = freshImg.naturalHeight || freshImg.height || cv.height;
       const outCtx = out.getContext('2d');
-
-      // Draw original image
       outCtx.drawImage(freshImg, 0, 0);
-
-      // Scale and overlay the drawing canvas
       const scaleX = out.width  / cv.width;
       const scaleY = out.height / cv.height;
-      outCtx.save();
-      outCtx.scale(scaleX, scaleY);
+      outCtx.save(); outCtx.scale(scaleX, scaleY);
       outCtx.drawImage(cv, 0, 0);
       outCtx.restore();
-
       const dataUrl = out.toDataURL('image/jpeg', 0.92);
-
-      // Update viewerImages
-      viewerImages[viewerIdx] = dataUrl;
-
-      // Find trade and update
-      let saved = false;
-      trades.forEach(t=>{
-        if(!t.images) return;
-        const i = t.images.indexOf(origUrl);
-        if(i>=0){
-          t.images[i] = dataUrl;
-          dbSaveTrade(t).catch(e=>console.error('Save error:',e));
-          saved = true;
-        }
-      });
-
-      // Update displayed image and clear canvas
-      img.src = dataUrl;
-      ivClearCanvas();
-      ivUndoStack = [];
-
-      showSyncStatus(saved ? '✓ Tekening opgeslagen in Supabase' : '✓ Tekening opgeslagen');
-      setTimeout(()=>showSyncStatus(''), 2500);
-    } catch(err){
-      console.error('Canvas save error:', err);
-      // Fallback: save drawing canvas only as overlay (base64)
+      ivFinishSave(dataUrl, origUrl);
+    } catch(e){
       ivSaveDrawingFallback(img, cv, origUrl);
     }
   };
-  freshImg.onerror = function(){
-    // Direct fallback if CORS fails completely
-    ivSaveDrawingFallback(img, cv, origUrl);
-  };
-  // Add cache-busting to force re-fetch with CORS headers
-  freshImg.src = origUrl + (origUrl.includes('?')?'&':'?') + 'cb=' + Date.now();
+  freshImg.onerror = ()=>{ ivSaveDrawingFallback(img, cv, origUrl); };
+  freshImg.src = origUrl + (origUrl.includes('?')?'&':'?') + 'cb='+Date.now();
+}
+
+function ivFinishSave(dataUrl, origUrl){
+  const img = document.getElementById('img-viewer-img');
+
+  // Insert the drawn version AFTER the original in viewerImages + trade
+  const insertIdx = viewerIdx + 1;
+  viewerImages.splice(insertIdx, 0, dataUrl);
+
+  // Update in trade — insert after origUrl
+  trades.forEach(t=>{
+    if(!t.images) return;
+    const i = t.images.indexOf(origUrl);
+    if(i>=0){
+      t.images.splice(i+1, 0, dataUrl);
+      dbSaveTrade(t).catch(e=>console.error('Save error:',e));
+      // Refresh detail popup images
+      const imgsWrap = document.getElementById('td-imgs-wrap');
+      if(imgsWrap){
+        const allImgs = t.images;
+        imgsWrap.querySelector && (imgsWrap.innerHTML = `
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Afbeeldingen (${allImgs.length})</div>
+          <div class="td-imgs">${allImgs.map((src,idx)=>`
+            <div style="position:relative;display:inline-block">
+              <img class="td-img-thumb" src="${src}" onclick="openImgViewer(${idx})" title="Vergroot">
+              ${idx>0 && allImgs[idx-1]===origUrl ? `<button onclick="ivDeleteDrawnImg(${trades.indexOf(t)},${idx})" style="position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center" title="Verwijder tekening">×</button>` : ''}
+            </div>`).join('')}
+          </div>`);
+      }
+    }
+  });
+
+  // Navigate to the new drawn image
+  viewerIdx = insertIdx;
+  img.src = dataUrl;
+  ivClearCanvas();
+  ivUndoStack = [];
+
+  // Update nav buttons
+  document.querySelector('.img-viewer-prev').style.display = viewerImages.length>1?'flex':'none';
+  document.querySelector('.img-viewer-next').style.display = viewerImages.length>1?'flex':'none';
+
+  showSyncStatus('✓ Tekening opgeslagen als nieuwe afbeelding — origineel behouden');
+  setTimeout(()=>showSyncStatus(''), 3000);
+}
+
+function ivDeleteDrawnImg(tradeIdx, imgIdx){
+  if(!confirm('Verwijder deze tekening? Het origineel blijft bewaard.')) return;
+  const t = trades[tradeIdx];
+  t.images.splice(imgIdx, 1);
+  dbSaveTrade(t).catch(e=>console.error(e));
+  // Refresh viewerImages
+  viewerImages = [...t.images];
+  if(viewerIdx >= viewerImages.length) viewerIdx = viewerImages.length-1;
+  const img = document.getElementById('img-viewer-img');
+  if(viewerImages.length){
+    img.src = viewerImages[viewerIdx];
+  } else {
+    closeImgViewer();
+  }
+  document.querySelector('.img-viewer-prev').style.display = viewerImages.length>1?'flex':'none';
+  document.querySelector('.img-viewer-next').style.display = viewerImages.length>1?'flex':'none';
+  showSyncStatus('✓ Tekening verwijderd');
+  setTimeout(()=>showSyncStatus(''),2000);
 }
 
 function ivSaveDrawingFallback(img, cv, origUrl){
-  // Fallback: merge using the already-loaded img (may be tainted, but worth trying)
   try {
     const out = document.createElement('canvas');
-    out.width = cv.width; out.height = cv.height;
-    const ctx = out.getContext('2d');
-    ctx.drawImage(img, 0, 0, cv.width, cv.height);
-    ctx.drawImage(cv, 0, 0);
-    const dataUrl = out.toDataURL('image/jpeg', 0.92);
-    viewerImages[viewerIdx] = dataUrl;
-    trades.forEach(t=>{
-      if(!t.images) return;
-      const i = t.images.indexOf(origUrl);
-      if(i>=0){ t.images[i]=dataUrl; dbSaveTrade(t).catch(()=>{}); }
-    });
-    img.src = dataUrl;
-    ivClearCanvas(); ivUndoStack=[];
-    showSyncStatus('✓ Tekening opgeslagen');
-    setTimeout(()=>showSyncStatus(''),2500);
+    out.width=cv.width; out.height=cv.height;
+    const ctx=out.getContext('2d');
+    ctx.drawImage(img,0,0,cv.width,cv.height);
+    ctx.drawImage(cv,0,0);
+    const dataUrl = out.toDataURL('image/jpeg',0.92);
+    ivFinishSave(dataUrl, origUrl);
   } catch(e){
-    showSyncStatus('⚠️ Opslaan mislukt (CORS). Probeer Supabase Storage CORS in te stellen.');
+    showSyncStatus('⚠️ Opslaan mislukt. Controleer CORS instellingen Supabase Storage.');
     setTimeout(()=>showSyncStatus(''),4000);
-    console.error('Fallback also failed:', e);
   }
 }
 
@@ -2080,10 +2209,28 @@ document.addEventListener('keydown', e => {
     if(e.key==='ArrowRight') navImg(1);
     if(e.key==='Escape')     closeImgViewer();
   }
-  if(document.getElementById('trade-detail').style.display!=='none' && e.key==='Escape'){
-    closeTradeDetail();
+  if(document.getElementById('trade-detail').style.display!=='none'){
+    if(e.key==='Escape')      closeTradeDetail();
+    if(e.key==='ArrowLeft')   navTradeDetail(-1);
+    if(e.key==='ArrowRight')  navTradeDetail(1);
   }
 });
+
+// Swipe support for trade detail popup (iPhone)
+let tdSwipeStartX = 0;
+document.addEventListener('touchstart', e=>{
+  if(document.getElementById('trade-detail').style.display!=='none'){
+    tdSwipeStartX = e.touches[0].clientX;
+  }
+},{passive:true});
+document.addEventListener('touchend', e=>{
+  if(document.getElementById('trade-detail').style.display!=='none'){
+    const dx = e.changedTouches[0].clientX - tdSwipeStartX;
+    if(Math.abs(dx) > 60){
+      navTradeDetail(dx < 0 ? 1 : -1);
+    }
+  }
+},{passive:true});
 
 // ============================================================
 //  SAVE / EDIT / DELETE
@@ -2605,46 +2752,65 @@ function renderStratChart(all){
     const ts = all.filter(t=>t.strat===s);
     const w = ts.filter(t=>+t.pnl>0).length;
     const l = ts.filter(t=>+t.pnl<0).length;
+    const be= ts.filter(t=>+t.pnl===0).length;
     const totalRU = ts.reduce((a,t)=>a+(+t.ru||0),0);
     const avgRU = ts.length?totalRU/ts.length:0;
-    return {s, ts, w, l, totalRU, avgRU, n:ts.length};
+    const winPnl  = ts.filter(t=>+t.pnl>0).reduce((a,t)=>a+(+t.pnl||0),0);
+    const lossPnl = ts.filter(t=>+t.pnl<0).reduce((a,t)=>a+Math.abs(+t.pnl||0),0);
+    const pf = lossPnl>0 ? Math.round(winPnl/lossPnl*100)/100 : (winPnl>0?'∞':'-');
+    return {s, ts, w, l, be, totalRU, avgRU, n:ts.length, pf};
   }).filter(d=>d.n>0);
 
   if(!data.length){ el.innerHTML='<div class="empty" style="padding:1rem">Geen data.</div>'; return; }
-  el.innerHTML = data.map(d=>{
+  // Column layout: name | trades | gem RU | PF | totaal RU | bar+WL
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:140px 60px 80px 60px 70px 1fr 60px;gap:4px 10px;align-items:center;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border)">
+      <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Strategie</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">Trades</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">Gem. RU</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">PF</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">Totaal</span>
+      <span></span>
+      <span style="font-size:10px;color:var(--text3);text-align:center">W / L</span>
+    </div>` +
+  data.map(d=>{
     const total = d.w+d.l;
     const wp = total>0?Math.round(d.w/total*100):0;
     const lp = 100-wp;
     const ruColor = d.totalRU>=0?'var(--green)':'var(--red)';
-    return `<div class="sc-item">
-      <div class="sc-header">
-        <span class="sc-name">${d.s}</span>
-        <div class="sc-stats">
-          <span>Trades: <span>${d.n}</span></span>
-          <span>Gem: <span style="color:${d.avgRU>=0?'var(--green)':'var(--red)'}">${d.avgRU>=0?'+':''}${fmt(d.avgRU,1)}R</span></span>
-          <span>Totaal: <span style="color:${ruColor}">${d.totalRU>=0?'+':''}${fmt(d.totalRU,1)}R</span></span>
-        </div>
+    const pfColor = typeof d.pf==='number'?(d.pf>=1?'var(--green)':'var(--red)'):'var(--text3)';
+    return `<div style="display:grid;grid-template-columns:140px 60px 80px 60px 70px 1fr 60px;gap:4px 10px;align-items:center;margin-bottom:7px">
+      <span style="font-size:12px;font-weight:600;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.s}</span>
+      <span style="font-size:11px;color:var(--text3);text-align:right">${d.n}</span>
+      <span style="font-size:11px;font-weight:600;text-align:right;color:${d.avgRU>=0?'var(--green)':'var(--red)'}">${d.avgRU>=0?'+':''}${fmt(d.avgRU,2)}R</span>
+      <span style="font-size:11px;font-weight:600;text-align:right;color:${pfColor}">${typeof d.pf==='number'?d.pf.toFixed(2):d.pf}</span>
+      <span style="font-size:12px;font-weight:700;text-align:right;color:${ruColor}">${d.totalRU>=0?'+':''}${fmt(d.totalRU,1)}R</span>
+      <div style="display:flex;height:14px;border-radius:4px;overflow:hidden;gap:1px">
+        <div style="width:${wp}%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${wp>=10?wp+'%':''}</div>
+        <div style="width:${lp}%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${lp>=10?lp+'%':''}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <div class="sc-bars" style="flex:1">
-          <div class="sc-green" style="width:${wp}%">${wp>=12?wp+'%':''}</div>
-          <div class="sc-red" style="width:${lp}%">${lp>=12?lp+'%':''}</div>
-        </div>
-        <span class="sc-total" style="color:${ruColor}">${d.totalRU>=0?'+':''}${fmt(d.totalRU,1)}R</span>
-      </div>
+      <span style="font-size:10px;color:var(--text3);text-align:center;white-space:nowrap">${d.w}W ${d.l}L</span>
     </div>`;
   }).join('');
 }
 
 function renderDirBars(all){
   const groups = [
-    {key:'Long',  lbl:'\u2191 Long',  trades: all.filter(t=>t.dir==='Long' &&!t.isPaper)},
-    {key:'Short', lbl:'\u2193 Short', trades: all.filter(t=>t.dir==='Short'&&!t.isPaper)},
-    {key:'Paper', lbl:'\U0001f4c4 Paper', trades: all.filter(t=>t.isPaper)}
+    {key:'Long',  lbl:'↑ Long',  trades: all.filter(t=>t.dir==='Long' &&!t.isPaper)},
+    {key:'Short', lbl:'↓ Short', trades: all.filter(t=>t.dir==='Short'&&!t.isPaper)},
+    {key:'Paper', lbl:'📄 Paper', trades: all.filter(t=>t.isPaper)}
   ].filter(g=>g.trades.length>0);
 
   function makeBar(elId, isRU){
-    document.getElementById(elId).innerHTML = groups.map(g=>{
+    const header = `<div style="display:grid;grid-template-columns:80px 60px 60px 1fr 70px;gap:4px 10px;align-items:center;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border)">
+      <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Richting</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">Trades</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">W / L</span>
+      <span></span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">Totaal</span>
+    </div>`;
+
+    const rows = groups.map(g=>{
       const wins = g.trades.filter(t=>isRU?(+t.ru>0):(+t.pnl>0));
       const loss = g.trades.filter(t=>isRU?(+t.ru<0):(+t.pnl<0));
       const be   = g.trades.filter(t=>isRU?(+t.ru===0):(+t.pnl===0));
@@ -2655,23 +2821,20 @@ function renderDirBars(all){
       const totVal = g.trades.reduce((s,t)=>s+(isRU?(+t.ru||0):(+t.pnl||0)),0);
       const valColor = totVal>=0?'var(--green)':'var(--red)';
       const display = isRU?`${totVal>=0?'+':''}${fmt(totVal,1)}R`:`${totVal>=0?'+':''}${fmtU(totVal)}`;
-      return `<div style="margin-bottom:12px;cursor:pointer" onclick="openDirPopup('${g.key}','${isRU?'ru':'usd'}')">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-size:12px;font-weight:600;color:var(--text2)">${g.lbl}</span>
-          <span style="font-size:11px;font-weight:700;color:${valColor}">${display}&nbsp;<span style="font-size:10px;color:var(--text3)">${total} trades</span></span>
+      return `<div style="display:grid;grid-template-columns:80px 60px 60px 1fr 70px;gap:4px 10px;align-items:center;margin-bottom:8px;cursor:pointer" onclick="openDirPopup('${g.key}','${isRU?'ru':'usd'}')">
+        <span style="font-size:12px;font-weight:600;color:var(--text2)">${g.lbl}</span>
+        <span style="font-size:11px;color:var(--text3);text-align:right">${total}</span>
+        <span style="font-size:10px;color:var(--text3);text-align:right;white-space:nowrap"><span style="color:var(--green)">${wins.length}W</span> <span style="color:var(--red)">${loss.length}L</span></span>
+        <div style="display:flex;height:16px;border-radius:4px;overflow:hidden;gap:1px">
+          ${wp>0?`<div style="width:${wp}%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${wp>=10?wp+'%':''}</div>`:''}
+          ${bp>0?`<div style="width:${bp}%;background:var(--text3);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff">${bp>=10?bp+'%':''}</div>`:''}
+          ${lp>0?`<div style="width:${lp}%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${lp>=10?lp+'%':''}</div>`:''}
         </div>
-        <div style="display:flex;height:20px;border-radius:4px;overflow:hidden;gap:1px">
-          ${wp>0?`<div style="width:${wp}%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600">${wp>=8?wp+'%':''}</div>`:''}
-          ${bp>0?`<div style="width:${bp}%;background:var(--text3);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff">${bp>=8?bp+'%':''}</div>`:''}
-          ${lp>0?`<div style="width:${lp}%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:600">${lp>=8?lp+'%':''}</div>`:''}
-        </div>
-        <div style="display:flex;gap:10px;margin-top:3px;font-size:10px;color:var(--text3)">
-          <span style="color:var(--green)">\u2713 ${wins.length} winst</span>
-          ${be.length?`<span>\u2014 ${be.length} BE</span>`:''}
-          <span style="color:var(--red)">\u2717 ${loss.length} verlies</span>
-        </div>
+        <span style="font-size:12px;font-weight:700;text-align:right;color:${valColor};white-space:nowrap">${display}</span>
       </div>`;
     }).join('');
+
+    document.getElementById(elId).innerHTML = header + rows;
   }
   makeBar('dir-bars', true);
   makeBar('dir-bars-usd', false);
