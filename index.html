@@ -121,8 +121,10 @@ table.tlog tr.paper-row td{color:var(--paper)}
 .py{background:var(--green-bg);color:var(--green)}
 .pn{background:var(--red-bg);color:var(--red)}
 .pst{background:var(--bg3);color:var(--text2);border:.5px solid var(--border2)}
-.t-act{display:flex;gap:4px}
-.icon-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:3px;font-size:15px;border-radius:4px}
+.t-act{display:flex;gap:4px;width:140px;justify-content:flex-end}
+.icon-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:3px;font-size:15px;border-radius:4px;width:24px;text-align:center;flex-shrink:0}
+.icon-btn-placeholder{width:24px;flex-shrink:0}
+.notes-popup{position:absolute;right:0;top:100%;margin-top:4px;background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rsm);padding:10px 12px;font-size:12px;color:var(--text2);max-width:280px;white-space:pre-wrap;line-height:1.5;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4);pointer-events:none}
 .icon-btn:hover{color:var(--text);background:var(--bg3)}
 
 /* FILTER BAR */
@@ -371,6 +373,7 @@ input[type=range]{accent-color:var(--green);width:100%}
           <div class="img-previews" id="img-previews"></div>
           <div class="fg" style="margin-top:8px"><label>Of screenshot link</label><input type="url" id="f-link" placeholder="https://..."></div>
         </div>
+        <div class="fg"><label>Opmerkingen</label><textarea id="f-notes" placeholder="Vrije beschrijving, analyse, lessen..." style="min-height:80px;resize:vertical;font-family:inherit;font-size:13px"></textarea></div>
         <button class="btn btn-secondary" onclick="clearForm()">Wissen</button>
         <button class="btn btn-primary" onclick="saveTrade()">Trade opslaan</button>
       </div>
@@ -567,6 +570,7 @@ input[type=range]{accent-color:var(--green);width:100%}
     <div class="td-body">
       <div class="td-grid" id="td-grid"></div>
       <div id="td-emos-wrap"></div>
+      <div id="td-notes-wrap"></div>
       <div id="td-imgs-wrap"></div>
     </div>
     <div style="padding:10px 18px 14px;display:flex;gap:8px;border-top:.5px solid var(--border)">
@@ -701,7 +705,8 @@ function rowToTrade(r){
     pnl: parseFloat(r.pnl)||0, ru: parseFloat(r.ru)||0,
     stars: r.stars||0,
     emos: r.emos||[], link: r.link||'',
-    images: r.images||[], bt: r.bt||{}
+    images: r.images||[], bt: r.bt||{},
+    notes: r.notes||''
   };
 }
 
@@ -715,7 +720,8 @@ function tradeToRow(t){
     pnl: t.pnl, ru: t.ru,
     stars: t.stars||0,
     emos: t.emos||[], link: t.link||'',
-    images: t.images||[], bt: t.bt||{}
+    images: t.images||[], bt: t.bt||{},
+    notes: t.notes||''
   };
 }
 
@@ -1329,6 +1335,51 @@ function getFilteredTrades(){
 }
 
 // ============================================================
+//  ACTION BUTTON HELPERS
+// ============================================================
+function makeImgBtn(t, idx){
+  const imgs = t.images||[];
+  const hasMedia = imgs.length>0 || t.link;
+  if(!hasMedia) return '<span class="icon-btn-placeholder"></span>';
+  const preview = imgs.slice(0,3).map(src=>
+    `<img src="${src}" style="width:80px;height:60px;object-fit:cover;border-radius:3px;flex-shrink:0">`
+  ).join('');
+  const countLbl = imgs.length>1 ? `<div style="font-size:10px;color:var(--text3);margin-bottom:5px">${imgs.length} afbeeldingen</div>` : '';
+  const linkRow  = t.link ? `<div style="margin-top:6px;font-size:11px;color:var(--blue)">🔗 Screenshot link</div>` : '';
+  return `<div style="position:relative;display:inline-block" onmouseenter="this.querySelector('.notes-popup').style.display='block'" onmouseleave="this.querySelector('.notes-popup').style.display='none'">
+    <button class="icon-btn" onclick="openTradeDetail(${idx},true)" style="color:var(--blue)">📷</button>
+    <div class="notes-popup" style="display:none;min-width:180px">${countLbl}<div style="display:flex;gap:4px;flex-wrap:wrap">${preview}</div>${linkRow}</div>
+  </div>`;
+}
+
+function makeNotesBtn(t){
+  if(!t.notes || !t.notes.trim()) return '<span class="icon-btn-placeholder"></span>';
+  const safe = t.notes.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return `<div style="position:relative;display:inline-block" onmouseenter="this.querySelector('.notes-popup').style.display='block'" onmouseleave="this.querySelector('.notes-popup').style.display='none'">
+    <button class="icon-btn" style="color:var(--amber)">📝</button>
+    <div class="notes-popup" style="display:none">${safe}</div>
+  </div>`;
+}
+
+function makeBtBtn(t, idx){
+  const btEntries = Object.entries(t.bt||{}).filter(([,v])=>typeof v==='number');
+  if(!btEntries.length) return `<button class="icon-btn" title="Backtest invullen" onclick="openBt(${idx})">📊</button>`;
+  const rows = btEntries.sort(([,a],[,b])=>b-a).slice(0,5).map(([ex,v])=>
+    `<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;padding:2px 0">
+      <span style="color:var(--text3)">${ex}</span>
+      <span style="font-weight:600;color:${v>=0?'var(--green)':'var(--red)'}">${v>=0?'+':''}${fmt(v,2)}R</span>
+    </div>`
+  ).join('');
+  return `<div style="position:relative;display:inline-block" onmouseenter="this.querySelector('.notes-popup').style.display='block'" onmouseleave="this.querySelector('.notes-popup').style.display='none'">
+    <button class="icon-btn" onclick="openBt(${idx})" style="color:var(--green)">📊</button>
+    <div class="notes-popup" style="display:none;min-width:200px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Backtest resultaten</div>
+      ${rows}
+    </div>
+  </div>`;
+}
+
+// ============================================================
 //  LOG RENDER
 // ============================================================
 let sortCol = 'date';
@@ -1388,11 +1439,12 @@ function renderLog(){
       <td style="color:var(--amber);font-size:15px;letter-spacing:1px">${stars5(t.stars||0)}</td>
       <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;color:var(--text3);font-size:11px">${emos}</td>
       <td onclick="event.stopPropagation()">
-        <div class="t-act">
-          <button class="icon-btn" title="${hasMedia?'Afbeeldingen bekijken':'Geen afbeeldingen'}" onclick="openTradeDetail(${idx},true)" style="color:${hasMedia?'var(--blue)':'var(--border2)'}">📷</button>
+        <div class="t-act" style="position:relative">
+          ${makeImgBtn(t,idx)}
+          ${makeNotesBtn(t)}
           <button class="icon-btn" title="Bewerken" onclick="openEdit(${idx})">✏</button>
           <button class="icon-btn" title="Kopiëren" onclick="copyTrade(${idx})">⧉</button>
-          <button class="icon-btn" title="${hasBt?'Backtest ingevuld':'Backtest invullen'}" onclick="openBt(${idx})" style="color:${hasBt?'var(--green)':'var(--text3)'}">📊</button>
+          ${makeBtBtn(t,idx)}
           <button class="icon-btn" title="Verwijderen" onclick="delTrade(${idx})" style="color:var(--red)">×</button>
         </div>
       </td>
@@ -1451,6 +1503,15 @@ function openTradeDetail(idx, scrollToImg){
   } else {
     emosWrap.innerHTML = '';
     emosWrap.style.marginBottom = '0';
+  }
+
+  // Notes
+  const notesWrap = document.getElementById('td-notes-wrap');
+  if(t.notes && t.notes.trim()){
+    notesWrap.innerHTML = `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Opmerkingen</div>
+      <div style="font-size:13px;color:var(--text2);background:var(--bg3);border-radius:var(--rsm);padding:10px 12px;line-height:1.5;white-space:pre-wrap;margin-bottom:14px">${t.notes}</div>`;
+  } else {
+    notesWrap.innerHTML = '';
   }
 
   // Images
@@ -1530,7 +1591,7 @@ document.addEventListener('keydown', e => {
 //  SAVE / EDIT / DELETE
 // ============================================================
 function clearForm(){
-  ['f-ticker','f-pnl','f-ru','f-link'].forEach(id=>{ const el=document.getElementById(id); el.value=''; el.className=''; });
+  ['f-ticker','f-pnl','f-ru','f-link','f-notes'].forEach(id=>{ const el=document.getElementById(id); el.value=''; el.className=''; });
   document.querySelectorAll('#emo-grid .eo').forEach(e=>e.classList.remove('sel'));
   starVal=0; litStars(0); setDir('Long');
   // Paper standaard UIT
@@ -1573,6 +1634,7 @@ async function saveTrade(){
     plan: document.getElementById('f-plan').value,
     pnl, ru, emos, stars: starVal,
     link: document.getElementById('f-link').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
     images: imgUrls, bt: {}
   };
   showSyncStatus('⏳ Opslaan...');
@@ -1655,6 +1717,7 @@ function openEdit(i){
       <div class="img-previews" id="e-img-previews"></div>
     </div>
     <div class="fg"><label>Screenshot link</label><input type="url" id="e-link" value="${t.link||''}"></div>
+    <div class="fg"><label>Opmerkingen</label><textarea id="e-notes" placeholder="Vrije beschrijving, analyse, lessen..." style="min-height:80px;resize:vertical;font-family:inherit;font-size:13px">${t.notes||''}</textarea></div>
   `;
   renderEditPreviews();
   document.getElementById('edit-modal').style.display='flex';
@@ -1712,6 +1775,7 @@ async function saveEdit(){
     ru: Math.round(ru*100)/100,
     stars: editStarVal, emos,
     link: document.getElementById('e-link').value.trim(),
+    notes: document.getElementById('e-notes').value.trim(),
     images: [] // filled below
   };
 
