@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0f172a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -63,7 +63,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   .dash-grid-3{grid-template-columns:1fr}
   .tw{grid-template-columns:1fr}
   .mgrid{grid-template-columns:repeat(2,1fr)}
+  .strat-grid-row, .strat-grid-hdr{
+    grid-template-columns:minmax(60px,1fr) 35px 55px 35px 45px 1fr 40px !important;
+    gap:3px 5px !important;
+    font-size:9px !important;
+  }
+  .dir-grid-row, .dir-grid-hdr{
+    grid-template-columns:50px 35px 45px 1fr 55px !important;
+    gap:3px 5px !important;
+  }
 }
+.strat-grid-hdr, .strat-grid-row{display:grid;grid-template-columns:minmax(80px,140px) minmax(40px,60px) minmax(50px,80px) minmax(40px,60px) minmax(50px,70px) 1fr minmax(40px,60px);gap:4px 8px;align-items:center}
+.dir-grid-hdr, .dir-grid-row{display:grid;grid-template-columns:minmax(60px,80px) minmax(40px,60px) minmax(50px,60px) 1fr minmax(50px,70px);gap:4px 8px;align-items:center}
 .ct{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
 .ct-expand{background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:0 2px;line-height:1}
 .ct-expand:hover{color:var(--text)}
@@ -251,6 +262,7 @@ input[type=range]{accent-color:var(--green);width:100%}
   <div class="hdr">
     <h1>Trade <span>Journal</span></h1>
     <div class="hdr-badge" id="hdr-count">0 trades</div>
+    <button class="exp-btn" onclick="manualSync()" title="Hersynchroniseer met database" style="background:none;border:.5px solid var(--border2);color:var(--text3)">⟳ Sync</button>
     <button class="exp-btn" onclick="exportCSV()">↓ CSV</button>
   </div>
   <div id="sync-status" style="display:none;background:var(--bg3);color:var(--text2);font-size:11px;padding:6px 16px;text-align:center;border-bottom:.5px solid var(--border)"></div>
@@ -260,7 +272,7 @@ input[type=range]{accent-color:var(--green);width:100%}
     <div id="sec-log" class="sec active">
       <div class="mgrid" id="log-kpis"></div>
       <div class="card">
-        <div class="ct">Filters</div>
+        <div class="ct">Filters <button onclick="resetLogFilters()" style="font-size:10px;padding:3px 10px;background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:20px;cursor:pointer;margin-left:4px">&#8635; Alles resetten</button></div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <!-- Row 1: Type -->
           <div style="display:flex;align-items:center;gap:8px">
@@ -272,10 +284,15 @@ input[type=range]{accent-color:var(--green);width:100%}
             <span style="font-size:10px;color:var(--text3);min-width:58px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Richting</span>
             <div class="fscroll" id="log-filter-dir" style="margin-bottom:0;padding-bottom:0"></div>
           </div>
-          <!-- Row 3: Strategie + Plan -->
+          <!-- Row 3: Strategie -->
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:10px;color:var(--text3);min-width:58px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Strategie</span>
             <div class="fscroll" id="log-filter-strat" style="margin-bottom:0;padding-bottom:0"></div>
+          </div>
+          <!-- Row 4: Emotie multi-select -->
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <span style="font-size:10px;color:var(--text3);min-width:58px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding-top:3px">Emotie</span>
+            <div class="fscroll" id="log-filter-emo" style="margin-bottom:0;padding-bottom:0;flex-wrap:wrap"></div>
           </div>
         </div>
       </div>
@@ -503,9 +520,9 @@ input[type=range]{accent-color:var(--green);width:100%}
           <div class="cw"><canvas id="c-bt"></canvas></div>
         </div>
         <div class="card">
-          <div class="ct">Gemiste RU (werkelijk vs backtest) <button class="ct-expand" onclick="openChartModal('c-missed','Gemiste RU')">⛶</button></div>
+          <div class="ct">Gemiste RU per strategie</div>
           <div class="fscroll" id="missed-filter-bar"></div>
-          <div class="cw" id="c-missed-wrap"><canvas id="c-missed"></canvas></div>
+          <div id="c-missed-wrap"></div>
         </div>
       </div>
 
@@ -662,6 +679,9 @@ input[type=range]{accent-color:var(--green);width:100%}
 <div id="chart-popup" class="chart-modal" style="display:none" onclick="closeChartPopup(event)">
   <div class="chart-modal-box">
     <div class="modal-title" id="chart-popup-title">- <button class="modal-close" onclick="closeChartPopup()">×</button></div>
+    <div id="chart-popup-filters" style="display:none;padding:6px 4px 0">
+      <div class="fscroll" id="popup-eq-dr-bar"></div>
+    </div>
     <div class="cw" style="height:380px"><canvas id="c-popup"></canvas></div>
   </div>
 </div>
@@ -685,6 +705,7 @@ let pendingImages = []; // {file: File, preview: string}
 let logFilterType = 'all';   // all | Live | Paper
 let logFilterDir  = 'all';   // all | Long | Short
 let logFilterStrat = 'all';  // all | strategie | Ja | Nee
+let logFilterEmos = [];      // [] = geen filter, anders array van geselecteerde emoties
 let dashFilterType  = 'all';  // all | Live | Paper
 let dashFilterDir   = 'all';  // all | Long | Short
 let dashFilterStrat = 'all';  // all | strategie
@@ -749,6 +770,7 @@ let dbReady = false;
 function rowToTrade(r){
   return {
     _id: r.id,
+    _updatedAt: r.updated_at || r.created_at || '',
     date: r.date||'', time: r.time||'',
     ticker: r.ticker||'', dir: r.dir||'Long',
     isPaper: r.is_paper||false,
@@ -790,44 +812,82 @@ function migrateTrades(){
 }
 
 async function loadFromSupabase(){
-  showSyncStatus('⏳ Trades laden...');
+  showSyncStatus('⏳ Verbinden met database...');
   try {
     const rows = await supaFetch('trades?select=*&order=date.desc,time.desc');
-    trades = (rows||[]).map(rowToTrade);
+    const remoteTrades = (rows||[]).map(rowToTrade);
+
+    // Load local backup
+    let localTrades = [];
+    try {
+      const s = localStorage.getItem('tj4');
+      if(s) localTrades = JSON.parse(s);
+    } catch(e){}
+
+    // Smart merge: voor elke remote trade, kijk of we een nieuwere lokale versie hebben
+    if(localTrades.length > 0 && remoteTrades.length > 0){
+      const localById = {};
+      localTrades.forEach(t=>{ if(t._id) localById[t._id] = t; });
+      trades = remoteTrades.map(remote=>{
+        const local = localById[remote._id];
+        if(local && local._localUpdated){
+          // Lokale versie was handmatig bijgewerkt — houd die
+          return local;
+        }
+        return remote;
+      });
+      // Voeg lokale trades toe die nog niet in remote zitten (niet gesynchroniseerd)
+      localTrades.forEach(t=>{
+        if(!t._id && !remoteTrades.find(r=>r.date===t.date&&r.time===t.time&&r.ticker===t.ticker)){
+          trades.push(t);
+        }
+      });
+    } else {
+      trades = remoteTrades;
+    }
+
     migrateTrades();
 
-    // Also load startBalance from settings
+    // Load startBalance
     try {
       const sets = await supaFetch('app_settings?key=eq.startBalance&select=value');
       if(sets && sets[0]) startBalance = parseFloat(sets[0].value)||10000;
     } catch(e){}
 
     dbReady = true;
+
+    // Sla huidige staat op als backup
+    try { localStorage.setItem('tj4', JSON.stringify(trades)); } catch(e){}
+
     showSyncStatus('');
     renderLog();
-    document.getElementById('bal-input').value = startBalance;
+    if(document.getElementById('bal-input'))
+      document.getElementById('bal-input').value = startBalance;
 
-    // Migrate any existing localStorage trades to Supabase (one-time)
-    const local = localStorage.getItem('tj4');
-    if(local && trades.length === 0){
-      showSyncStatus('⏳ Lokale data importeren...');
-      const localTrades = JSON.parse(local);
-      for(const t of localTrades){
-        await supaFetch('trades', {
-          method:'POST',
-          prefer:'return=minimal',
-          body: JSON.stringify(tradeToRow(t))
-        });
+    // Migrate localStorage-only trades to Supabase (one-time)
+    const local = localStorage.getItem('tj4-migrate');
+    if(!local){
+      const unsynced = trades.filter(t=>!t._id);
+      if(unsynced.length > 0){
+        showSyncStatus(`⏳ ${unsynced.length} lokale trades synchroniseren...`);
+        for(const t of unsynced){
+          try { await dbSaveTrade(t); } catch(e){}
+        }
+        localStorage.setItem('tj4-migrate','done');
+        await loadFromSupabase();
+        return;
       }
-      localStorage.removeItem('tj4');
-      await loadFromSupabase();
     }
+
   } catch(e){
     const msg = e.message||String(e);
     console.error('Supabase verbinding mislukt:', msg);
-    showSyncStatus('⚠️ Verbinding mislukt: '+msg.slice(0,80)+' — offline modus');
-    // Fallback to localStorage
-    try { const s=localStorage.getItem('tj4'); if(s){trades=JSON.parse(s);migrateTrades();} } catch(e2){}
+    showSyncStatus('⚠️ Offline — lokale data geladen');
+    // Fallback to localStorage backup
+    try {
+      const s = localStorage.getItem('tj4');
+      if(s){ trades=JSON.parse(s); migrateTrades(); }
+    } catch(e2){}
     renderLog();
   }
 }
@@ -837,6 +897,21 @@ function showSyncStatus(msg){
   if(!el) return;
   el.textContent = msg;
   el.style.display = msg ? 'block' : 'none';
+}
+
+async function manualSync(){
+  // Push any locally modified trades to Supabase first
+  const unsynced = trades.filter(t=>t._localUpdated);
+  if(unsynced.length > 0){
+    showSyncStatus(`⏳ ${unsynced.length} lokale wijzigingen opslaan...`);
+    for(const t of unsynced){
+      try { await dbSaveTrade(t); } catch(e){}
+    }
+  }
+  // Then reload from Supabase
+  await loadFromSupabase();
+  showSyncStatus('✓ Gesynchroniseerd met database');
+  setTimeout(()=>showSyncStatus(''), 2500);
 }
 
 async function persist(){
@@ -936,23 +1011,34 @@ function renderRiskEntries(){
 //  SUPABASE CRUD HELPERS
 // ============================================================
 async function dbSaveTrade(t){
+  // Always save local backup first
+  t._localUpdated = new Date().toISOString();
+  try { localStorage.setItem('tj4', JSON.stringify(trades)); } catch(e){}
+
   if(!dbReady) return;
   const row = tradeToRow(t);
-  if(t._id){
-    // Update existing
-    await supaFetch('trades?id=eq.'+t._id, {
-      method: 'PATCH',
-      prefer: 'return=minimal',
-      body: JSON.stringify(row)
-    });
-  } else {
-    // Insert new — get back the id
-    const res = await supaFetch('trades', {
-      method: 'POST',
-      prefer: 'return=representation',
-      body: JSON.stringify(row)
-    });
-    if(res && res[0]) t._id = res[0].id;
+  try {
+    if(t._id){
+      await supaFetch('trades?id=eq.'+t._id, {
+        method: 'PATCH',
+        prefer: 'return=minimal',
+        body: JSON.stringify(row)
+      });
+    } else {
+      const res = await supaFetch('trades', {
+        method: 'POST',
+        prefer: 'return=representation',
+        body: JSON.stringify(row)
+      });
+      if(res && res[0]){ t._id = res[0].id; t._updatedAt = res[0].updated_at||''; }
+    }
+    // Clear local flag after successful sync
+    delete t._localUpdated;
+    try { localStorage.setItem('tj4', JSON.stringify(trades)); } catch(e){}
+  } catch(e){
+    console.error('dbSaveTrade mislukt, lokaal bewaard:', e);
+    showSyncStatus('⚠️ Offline — lokaal opgeslagen');
+    setTimeout(()=>showSyncStatus(''), 3000);
   }
 }
 
@@ -1218,13 +1304,17 @@ function buildLogFilters(){
 
   document.getElementById('log-filter-strat').innerHTML =
     stratChips.map(f=>`<div class="fchip${f.k==='all'?' on':''}" onclick="setLFStrat('${f.k}',this)">${f.l}</div>`).join('');
+
+  // Emotie multi-select chips — "Alles" vooraan
+  document.getElementById('log-filter-emo').innerHTML =
+    `<div class="fchip on" onclick="resetLFEmo(this)">Alles</div>` +
+    EMOS.map(e=>`<div class="fchip" onclick="toggleLFEmo('${e}',this)">${ESHORT[e]||e}</div>`).join('');
 }
 
 function setLFType(k,el){
   logFilterType=k;
   document.querySelectorAll('#log-filter-type .fchip').forEach(c=>c.classList.remove('on'));
   el.classList.add('on');
-  // Paper heeft geen Long/Short — reset richting naar 'all' als Paper gekozen
   if(k==='Paper'){
     logFilterDir='all';
     document.querySelectorAll('#log-filter-dir .fchip').forEach((c,i)=>{c.classList.toggle('on',i===0);});
@@ -1246,6 +1336,32 @@ function setLFStrat(k,el){
   renderLog();
 }
 
+function toggleLFEmo(emo, el){
+  const idx = logFilterEmos.indexOf(emo);
+  if(idx>=0){ logFilterEmos.splice(idx,1); el.classList.remove('on'); }
+  else { logFilterEmos.push(emo); el.classList.add('on'); }
+  // Update "Alles" chip
+  const allesChip = document.querySelector('#log-filter-emo .fchip');
+  if(allesChip) allesChip.classList.toggle('on', logFilterEmos.length===0);
+  renderLog();
+}
+
+function resetLFEmo(el){
+  logFilterEmos=[];
+  document.querySelectorAll('#log-filter-emo .fchip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  renderLog();
+}
+
+function resetLogFilters(){
+  logFilterType='all'; logFilterDir='all'; logFilterStrat='all'; logFilterEmos=[];
+  document.querySelectorAll('#log-filter-type .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
+  document.querySelectorAll('#log-filter-dir .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
+  document.querySelectorAll('#log-filter-strat .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
+  document.querySelectorAll('#log-filter-emo .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
+  renderLog();
+}
+
 // Keep old names for compatibility (not used in HTML anymore)
 function setLogFilter(k,el){ setLFType(k,el); }
 function setLogFilter2(k,el){ setLFStrat(k,el); }
@@ -1263,10 +1379,10 @@ function buildDashFilters(){
     [{k:'all',l:'Alle strategieën'}].concat(STRATS.map(function(s){return{k:s,l:s};}))
     .map(function(f){ return '<div class="fchip'+(f.k==='all'?' on':'')+' " onclick="setDFStrat(\''+f.k+'\',this)">'+f.l+'</div>'; }).join('');
 
-  var ranges=[{k:'7d',l:'7 dagen'},{k:'30d',l:'30 dagen'},{k:'90d',l:'3 maanden'},{k:'180d',l:'Halfjaar'},{k:'365d',l:'Jaar'},{k:'all',l:'Alles'},{k:'custom',l:'Eigen periode'}];
+  var ranges=[{k:'all',l:'Alles'},{k:'7d',l:'Week'},{k:'30d',l:'Maand'},{k:'90d',l:'3 maanden'},{k:'180d',l:'6 maanden'},{k:'365d',l:'Jaar'},{k:'custom',l:'Eigen periode'}];
   document.getElementById('dash-dr-bar').innerHTML=ranges.map(function(r){return '<div class="drb'+(r.k==='30d'?' on':'')+' " onclick="setDashRange(\''+r.k+'\',this)">'+r.l+'</div>';}).join('');
 
-  [{id:'eq-dr-bar',items:[{k:'all',l:'Alles'},{k:'30d',l:'30d'},{k:'90d',l:'3m'},{k:'180d',l:'6m'},{k:'365d',l:'Jaar'},{k:'custom',l:'Eigen'}],fn:'setEqRange',def:'all'},{id:'ru-dr-bar',items:[{k:'day',l:'Dag'},{k:'week',l:'Week'},{k:'month',l:'Maand'},{k:'half',l:'Halfj.'},{k:'year',l:'Jaar'},{k:'all',l:'Alles'},{k:'custom',l:'Eigen'}],fn:'setRuRange',def:'day'}]
+  [{id:'eq-dr-bar',items:[{k:'all',l:'Alles'},{k:'7d',l:'Week'},{k:'30d',l:'Maand'},{k:'90d',l:'3m'},{k:'180d',l:'6m'},{k:'365d',l:'Jaar'},{k:'custom',l:'Eigen'}],fn:'setEqRange',def:'all'},{id:'ru-dr-bar',items:[{k:'day',l:'Dag'},{k:'week',l:'Week'},{k:'month',l:'Maand'},{k:'half',l:'Halfj.'},{k:'year',l:'Jaar'},{k:'all',l:'Alles'},{k:'custom',l:'Eigen'}],fn:'setRuRange',def:'day'}]
   .forEach(function(cfg){document.getElementById(cfg.id).innerHTML=cfg.items.map(function(r){return '<div class="drb'+(r.k===cfg.def?' on':'')+' " onclick="'+cfg.fn+'(\''+r.k+'\',this)">'+r.l+'</div>';}).join('');});
 
   document.getElementById('bt-filter-bar').innerHTML=[{k:'all',l:'Alles'},{k:'Long',l:'Long'},{k:'Short',l:'Short'}].concat(STRATS.map(s=>({k:s,l:s.split(' ')[0]}))).map(r=>`<div class="fchip${r.k==='all'?' on':''}" onclick="setBtFilter('${r.k}',this)">${r.l}</div>`).join('');
@@ -1286,7 +1402,7 @@ function resetDashFilters(){
   document.querySelectorAll('#dash-filter-strat .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
   // Reset periodefilter naar 30d
   dashDateRange='30d';
-  document.querySelectorAll('#dash-dr-bar .drb').forEach(c=>c.classList.toggle('on',c.textContent.trim()==='30 dagen'));
+  document.querySelectorAll('#dash-dr-bar .drb').forEach(c=>c.classList.toggle('on',c.textContent.trim()==='Maand'));
   document.getElementById('dash-custom').style.display='none';
   // Reset equity range
   eqDateRange='all'; eqShowTickers=false;
@@ -1325,8 +1441,15 @@ function fmt(v, dec=2){ return v.toLocaleString('nl-NL',{minimumFractionDigits:d
 function fmtR(v){ return (v>=0?'+':'')+fmt(v)+'R'; }
 function fmtU(v){ return (v>=0?'+':'')+'$'+fmt(Math.abs(v)); }
 function fmtUabs(v){ return '$'+fmt(Math.abs(v)); }
+// European date format: 2026-03-17 → 17-3 (or 17-3-26 with year)
+function fmtDate(iso, showYear=false){
+  if(!iso||iso.length<10) return iso||'';
+  const d = iso.slice(8,10).replace(/^0/,'');
+  const m = iso.slice(5,7).replace(/^0/,'');
+  return showYear ? d+'-'+m+'-'+iso.slice(2,4) : d+'-'+m;
+}
 function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0; }
-function stars5(n){ return '★'.repeat(n)+'☆'.repeat(5-n); }
+function stars5(n){ return '<span style="color:var(--amber)">'+'★'.repeat(n)+'</span>'+'<span style="color:var(--border2);opacity:.6">'+'★'.repeat(5-n)+'</span>'; }
 
 function dateOf(t){ try{ return new Date(t.date+'T00:00:00'); }catch(e){ return new Date(0); } }
 function daysAgo(n){ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-n); return d; }
@@ -1366,6 +1489,12 @@ function getFilteredLogTrades(){
       if(t.plan !== logFilterStrat) return false;
     } else if(logFilterStrat !== 'all'){
       if(t.strat !== logFilterStrat) return false;
+    }
+
+    // Filter 4: Emotie (multi-select — trade moet ALLE geselecteerde emoties bevatten)
+    if(logFilterEmos.length > 0){
+      const tEmos = t.emos || [];
+      if(!logFilterEmos.every(e => tEmos.includes(e))) return false;
     }
 
     return true;
@@ -1490,7 +1619,7 @@ function renderLog(){
       <td><span class="pill ${t.plan==='Ja'?'py':'pn'}">${t.plan==='Ja'?'✓':'✗'} ${t.plan}</span></td>
       <td style="color:${pnlColor};font-weight:700;font-variant-numeric:tabular-nums">$${fmt(pnl)}</td>
       <td style="color:${ruColor};font-weight:700;font-variant-numeric:tabular-nums">${ru>=0?'+':''}${fmt(ru)}R</td>
-      <td style="color:var(--amber);font-size:15px;letter-spacing:1px">${stars5(t.stars||0)}</td>
+      <td style="font-size:15px;letter-spacing:1px">${stars5(t.stars||0)}</td>
       <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;color:var(--text3);font-size:11px">${emos}</td>
       <td onclick="event.stopPropagation()">
         <div class="t-act" style="position:relative">
@@ -1505,15 +1634,22 @@ function renderLog(){
     </tr>`;
   }).join('') : `<tr><td colspan="12"><div class="empty"><div class="empty-i">📋</div>Geen trades gevonden.</div></td></tr>`;
 
-  const wins = list.filter(t=>+t.pnl>0).length;
+  const winTrades  = list.filter(t=>+t.pnl>0);
+  const lossTrades = list.filter(t=>+t.pnl<0);
+  const wins = winTrades.length;
   const wr = list.length?Math.round(wins/list.length*100):0;
-  const ru = list.reduce((s,t)=>s+(+t.ru||0),0);
+  const ru  = list.reduce((s,t)=>s+(+t.ru||0),0);
   const pnl = list.reduce((s,t)=>s+(+t.pnl||0),0);
   const avgR = avg(list.filter(t=>t.stars>0).map(t=>t.stars));
-  const winPnlLog  = list.filter(t=>+t.pnl>0).reduce((s,t)=>s+(+t.pnl||0),0);
-  const lossPnlLog = list.filter(t=>+t.pnl<0).reduce((s,t)=>s+Math.abs(+t.pnl||0),0);
+  const winPnlLog  = winTrades.reduce((s,t)=>s+(+t.pnl||0),0);
+  const lossPnlLog = lossTrades.reduce((s,t)=>s+Math.abs(+t.pnl||0),0);
   const pfLog = lossPnlLog>0 ? fmt(winPnlLog/lossPnlLog,2) : (winPnlLog>0?'∞':'-');
   const pfLogColor = lossPnlLog>0?(winPnlLog/lossPnlLog>=1?'pos':'neg'):'';
+  // Gem. wintrade / verliestrade
+  const avgWinPnl  = winTrades.length  ? winPnlLog/winTrades.length   : 0;
+  const avgLossPnl = lossTrades.length ? lossPnlLog/lossTrades.length : 0;
+  const avgWinRu   = winTrades.length  ? winTrades.reduce((s,t)=>s+(+t.ru||0),0)/winTrades.length   : 0;
+  const avgLossRu  = lossTrades.length ? lossTrades.reduce((s,t)=>s+Math.abs(+t.ru||0),0)/lossTrades.length : 0;
   document.getElementById('log-kpis').innerHTML = `
     <div class="m"><div class="ml">Trades</div><div class="mv">${list.length}</div></div>
     <div class="m"><div class="ml">Winrate</div><div class="mv ${wr>=50?'pos':'neg'}">${wr}%</div><div class="ms">${wins} winst</div></div>
@@ -1521,6 +1657,8 @@ function renderLog(){
     <div class="m"><div class="ml">Totaal P&L</div><div class="mv ${pnl>=0?'pos':'neg'}">${fmtU(pnl)}</div></div>
     <div class="m"><div class="ml">Gem. rating ★</div><div class="mv">${avgR>0?fmt(avgR,1):'-'}</div><div class="ms">/ 5 sterren</div></div>
     <div class="m"><div class="ml">Profit factor</div><div class="mv ${pfLogColor}">${pfLog}</div><div class="ms">winst/verlies</div></div>
+    <div class="m"><div class="ml">Gem. wintrade</div><div class="mv pos">${winTrades.length?'+'+fmtU(avgWinPnl):'-'}</div><div class="ms">${winTrades.length?'+'+fmt(avgWinRu,2)+'R':''}</div></div>
+    <div class="m"><div class="ml">Gem. verliestrade</div><div class="mv neg">${lossTrades.length?'-'+fmtU(avgLossPnl):'-'}</div><div class="ms">${lossTrades.length?'-'+fmt(avgLossRu,2)+'R':''}</div></div>
   `;
   document.getElementById('hdr-count').textContent = trades.length+' trades';
 }
@@ -2510,13 +2648,66 @@ function removeImg(i){ pendingImages.splice(i,1); renderPreviews(); }
 // ============================================================
 //  CHART POPUP
 // ============================================================
+let popupEqRange = 'all';
+let popupEqTickers = false;
+
 function openChartModal(chartId, title){
   document.getElementById('chart-popup-title').innerHTML = title+' <button class="modal-close" onclick="closeChartPopup()">×</button>';
   document.getElementById('chart-popup').style.display='flex';
-  const src = document.getElementById(chartId);
-  if(popupChart) popupChart.destroy();
-  if(src && src._chart){ popupChart = cloneChart(src._chart); }
+
+  const filtersEl = document.getElementById('chart-popup-filters');
+  if(chartId === 'c-equity'){
+    filtersEl.style.display = 'block';
+    const items = [{k:'all',l:'Alles'},{k:'7d',l:'Week'},{k:'30d',l:'Maand'},{k:'90d',l:'3m'},{k:'180d',l:'6m'},{k:'365d',l:'Jaar'}];
+    document.getElementById('popup-eq-dr-bar').innerHTML =
+      items.map(r=>`<div class="fchip${r.k===popupEqRange?' on':''}" onclick="setPopupEqRange('${r.k}',this)">${r.l}</div>`).join('') +
+      `<div class="fchip${popupEqTickers?' on':''}" onclick="togglePopupTickers(this)" style="margin-left:8px">Tickers ${popupEqTickers?'aan':'uit'}</div>`;
+    renderPopupEquity();
+  } else {
+    filtersEl.style.display = 'none';
+    const src = document.getElementById(chartId);
+    if(popupChart) popupChart.destroy();
+    if(src && src._chart){ popupChart = cloneChart(src._chart); }
+  }
 }
+
+function togglePopupTickers(el){
+  popupEqTickers = !popupEqTickers;
+  el.textContent = 'Tickers '+(popupEqTickers?'aan':'uit');
+  el.classList.toggle('on', popupEqTickers);
+  renderPopupEquity();
+}
+
+function setPopupEqRange(k, el){
+  popupEqRange = k;
+  document.querySelectorAll('#popup-eq-dr-bar .fchip').forEach(c=>{ if(c.textContent.startsWith('Tickers')) return; c.classList.remove('on'); });
+  el.classList.add('on');
+  renderPopupEquity();
+}
+
+function renderPopupEquity(){
+  let arr = getFilteredTrades();
+  if(popupEqRange !== 'all'){
+    const days = popupEqRange==='7d'?7:popupEqRange==='30d'?30:popupEqRange==='90d'?90:popupEqRange==='180d'?180:365;
+    arr = arr.filter(t=>dateOf(t)>=daysAgo(days));
+  }
+  arr = arr.sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+  if(popupChart) popupChart.destroy();
+  if(!arr.length) return;
+  let cum = 0;
+  const labels = arr.map(t=>popupEqTickers ? t.ticker+' '+fmtDate(t.date) : fmtDate(t.date));
+  const data   = arr.map(t=>{ cum+=(+t.pnl||0); return Math.round(cum*100)/100; });
+  const color  = cum>=0?'rgba(16,185,129,1)':'rgba(244,63,94,1)';
+  popupChart = new Chart(document.getElementById('c-popup'),{
+    type:'line',
+    data:{labels,datasets:[{label:'Cumulatief P&L',data,borderColor:color,backgroundColor:color.replace('1)','0.08)'),borderWidth:2,pointRadius:2,fill:true,tension:0.3}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'P&L: '+fmtU(ctx.raw)}}},
+      scales:{y:{ticks:{callback:v=>fmtU(v),color:'#64748b'},grid:{color:'rgba(255,255,255,.04)'}},
+              x:{ticks:{color:'#64748b',autoSkip:true,maxTicksLimit:12},grid:{display:false}}}}
+  });
+}
+
 function closeChartPopup(e){ if(!e||e.target===document.getElementById('chart-popup')){ document.getElementById('chart-popup').style.display='none'; } }
 function cloneChart(c){
   return new Chart(document.getElementById('c-popup'),{ type:c.config.type, data:JSON.parse(JSON.stringify(c.config.data)), options:JSON.parse(JSON.stringify(c.config.options||{})) });
@@ -2589,7 +2780,7 @@ function renderDash(){
   document.getElementById('pnl-stats').innerHTML = `
     <div class="m"><div class="ml">Gem. dag P&L</div><div class="mv ${avgDailyPnl>=0?'pos':'neg'}">${fmtU(avgDailyPnl)}</div></div>
     <div class="m"><div class="ml">Gem. wintrade</div><div class="mv pos">${avgWin>0?'$'+fmt(avgWin):'-'}</div></div>
-    <div class="m"><div class="ml">Gem. verlies</div><div class="mv neg">${avgLoss>0?'-$'+fmt(avgLoss):'-'}</div></div>
+    <div class="m"><div class="ml">Gem. verliestrade</div><div class="mv neg">${avgLoss>0?'-$'+fmt(avgLoss):'-'}</div></div>
     <div class="m"><div class="ml">Gem. win RU</div><div class="mv pos">${avgWinRU>0?'+'+fmt(avgWinRU)+'R':'-'}</div></div>
     <div class="m"><div class="ml">Gem. verlies RU</div><div class="mv neg">${avgLossRU>0?'-'+fmt(avgLossRU)+'R':'-'}</div></div>
   `;
@@ -2688,7 +2879,7 @@ function renderEquity(sorted){
     if(eqCustomFrom) arr = arr.filter(t=>t.date>=eqCustomFrom);
     if(eqCustomTo)   arr = arr.filter(t=>t.date<=eqCustomTo);
   } else if(eqDateRange!=='all'){
-    const days = eqDateRange==='30d'?30:eqDateRange==='90d'?90:eqDateRange==='180d'?180:365;
+    const days = eqDateRange==='7d'?7:eqDateRange==='30d'?30:eqDateRange==='90d'?90:eqDateRange==='180d'?180:365;
     const cut = daysAgo(days);
     arr = arr.filter(t=>dateOf(t)>=cut);
   }
@@ -2699,7 +2890,7 @@ function renderEquity(sorted){
   const data = [0];
   arr.forEach(t=>{
     cumPnl += +t.pnl||0;
-    const lbl = eqShowTickers ? t.ticker+' '+t.date.slice(5) : t.date.slice(5);
+    const lbl = eqShowTickers ? t.ticker+' '+fmtDate(t.date) : fmtDate(t.date);
     labels.push(lbl);
     data.push(Math.round(cumPnl*100)/100);
   });
@@ -2764,7 +2955,7 @@ function renderStratChart(all){
   if(!data.length){ el.innerHTML='<div class="empty" style="padding:1rem">Geen data.</div>'; return; }
   // Column layout: name | trades | gem RU | PF | totaal RU | bar+WL
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:140px 60px 80px 60px 70px 1fr 60px;gap:4px 10px;align-items:center;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border)">
+    <div style="display:grid;grid-template-columns:minmax(80px,140px) minmax(40px,60px) minmax(50px,80px) minmax(40px,60px) minmax(50px,70px) 1fr minmax(40px,60px);gap:4px 8px;align-items:center;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border)" class="strat-grid-hdr">
       <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Strategie</span>
       <span style="font-size:10px;color:var(--text3);text-align:right">Trades</span>
       <span style="font-size:10px;color:var(--text3);text-align:right">Gem. RU</span>
@@ -2779,7 +2970,7 @@ function renderStratChart(all){
     const lp = 100-wp;
     const ruColor = d.totalRU>=0?'var(--green)':'var(--red)';
     const pfColor = typeof d.pf==='number'?(d.pf>=1?'var(--green)':'var(--red)'):'var(--text3)';
-    return `<div style="display:grid;grid-template-columns:140px 60px 80px 60px 70px 1fr 60px;gap:4px 10px;align-items:center;margin-bottom:7px">
+    return `<div style="display:grid;grid-template-columns:minmax(80px,140px) minmax(40px,60px) minmax(50px,80px) minmax(40px,60px) minmax(50px,70px) 1fr minmax(40px,60px);gap:4px 8px;align-items:center;margin-bottom:7px" class="strat-grid-row">
       <span style="font-size:12px;font-weight:600;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.s}</span>
       <span style="font-size:11px;color:var(--text3);text-align:right">${d.n}</span>
       <span style="font-size:11px;font-weight:600;text-align:right;color:${d.avgRU>=0?'var(--green)':'var(--red)'}">${d.avgRU>=0?'+':''}${fmt(d.avgRU,2)}R</span>
@@ -2802,7 +2993,7 @@ function renderDirBars(all){
   ].filter(g=>g.trades.length>0);
 
   function makeBar(elId, isRU){
-    const header = `<div style="display:grid;grid-template-columns:80px 60px 60px 1fr 70px;gap:4px 10px;align-items:center;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border)">
+    const header = `<div style="display:grid;grid-template-columns:minmax(60px,80px) minmax(40px,60px) minmax(50px,60px) 1fr minmax(50px,70px);gap:4px 8px;align-items:center;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border)" class="dir-grid-hdr">
       <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Richting</span>
       <span style="font-size:10px;color:var(--text3);text-align:right">Trades</span>
       <span style="font-size:10px;color:var(--text3);text-align:right">W / L</span>
@@ -2821,7 +3012,7 @@ function renderDirBars(all){
       const totVal = g.trades.reduce((s,t)=>s+(isRU?(+t.ru||0):(+t.pnl||0)),0);
       const valColor = totVal>=0?'var(--green)':'var(--red)';
       const display = isRU?`${totVal>=0?'+':''}${fmt(totVal,1)}R`:`${totVal>=0?'+':''}${fmtU(totVal)}`;
-      return `<div style="display:grid;grid-template-columns:80px 60px 60px 1fr 70px;gap:4px 10px;align-items:center;margin-bottom:8px;cursor:pointer" onclick="openDirPopup('${g.key}','${isRU?'ru':'usd'}')">
+      return `<div style="display:grid;grid-template-columns:minmax(60px,80px) minmax(40px,60px) minmax(50px,60px) 1fr minmax(50px,70px);gap:4px 8px;align-items:center;margin-bottom:8px;cursor:pointer" class="dir-grid-row" onclick="openDirPopup('${g.key}','${isRU?'ru':'usd'}')">
         <span style="font-size:12px;font-weight:600;color:var(--text2)">${g.lbl}</span>
         <span style="font-size:11px;color:var(--text3);text-align:right">${total}</span>
         <span style="font-size:10px;color:var(--text3);text-align:right;white-space:nowrap"><span style="color:var(--green)">${wins.length}W</span> <span style="color:var(--red)">${loss.length}L</span></span>
@@ -2904,7 +3095,7 @@ function renderRuChart(all){
       d.setDate(d.getDate()-day+1);
       return d.toISOString().slice(0,10);
     }
-    if(ruDateRange==='month') return date.slice(0,7);
+    if(ruDateRange==='month'){ const p=date.slice(0,7); return p.slice(5).replace(/^0/,'')+'-'+p.slice(2,4); }
     if(ruDateRange==='half'){
       const m = parseInt(date.slice(5,7));
       return date.slice(0,4)+'-H'+(m<=6?'1':'2');
@@ -2915,11 +3106,11 @@ function renderRuChart(all){
   }
 
   function fmtKey(key){
-    if(ruDateRange==='day')   return key.slice(5);
-    if(ruDateRange==='week')  return 'Wk '+key.slice(5);
+    if(ruDateRange==='day')   return fmtDate(key);
+    if(ruDateRange==='week')  return 'Wk '+fmtDate(key);
     if(ruDateRange==='month') return key;
     // all en custom: toon maand-dag
-    return key.length===10 ? key.slice(5) : key;
+    return key.length===10 ? fmtDate(key) : key;
   }
 
   // Groepeer alle trades per periode
@@ -3227,71 +3418,129 @@ function renderMissedChart(all){
   if(cMissed) cMissed.destroy();
   const wrap = document.getElementById('c-missed-wrap');
   if(!arr.length){
-    wrap.innerHTML='<div class="empty" style="padding:2rem;text-align:center"><div class="empty-i">📊</div>Geen backtest data voor deze filter.</div><canvas id="c-missed" style="display:none"></canvas>';
+    wrap.innerHTML='<div class="empty" style="padding:2rem;text-align:center"><div class="empty-i">📊</div>Geen backtest data voor deze filter.</div>';
     return;
   }
-  wrap.innerHTML='<canvas id="c-missed"></canvas>';
-  const actual  = arr.map(t=>+t.ru||0);
-  const bestBt  = arr.map(t=>{ const vals=Object.values(t.bt||{}).filter(v=>typeof v==='number'); return vals.length?Math.max(...vals):null; });
-  const missed  = arr.map((t,i)=>{ const b=bestBt[i]; return b!==null?Math.round((b-actual[i])*100)/100:null; });
-  const labels  = arr.map(t=>t.ticker+' '+t.date.slice(5));
-  const actColors = actual.map(v=>v>=0?'rgba(16,185,129,.75)':'rgba(244,63,94,.75)');
-  const missColors= missed.map(v=>v!==null&&v>0?'rgba(251,191,36,.7)':'rgba(100,116,139,.3)');
-  cMissed = new Chart(document.getElementById('c-missed'),{
-    type:'bar',
-    data:{labels, datasets:[
-      {label:'Werkelijk RU', data:actual, backgroundColor:actColors, borderRadius:3},
-      {label:'Best backtest RU', data:bestBt, backgroundColor:'rgba(139,92,246,.35)', borderRadius:3},
-      {label:'Gemiste RU', data:missed, backgroundColor:missColors, borderRadius:3}
-    ]},
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      onClick:(evt,els)=>{ if(els.length) openMissedPopup(arr[els[0].index]); },
-      plugins:{
-        legend:{labels:{color:'#94a3b8',font:{size:11}}},
-        tooltip:{callbacks:{
-          title:ctx=>{ const t=arr[ctx[0].dataIndex]; return t.ticker+' · '+t.date; },
-          label:ctx=>{
-            const v=ctx.raw; const ds=ctx.dataset.label;
-            if(v===null||v===undefined) return ds+': geen data';
-            if(ds==='Gemiste RU') return v>0?'+'+fmt(v,2)+'R gemist':'✓ Beter dan backtest';
-            return ds+': '+(v>=0?'+':'')+fmt(v,2)+'R';
-          }
-        }}
-      },
-      scales:{
-        y:{ticks:{callback:v=>(v>=0?'+':'')+fmt(v,1)+'R',color:'#64748b'},grid:{color:'rgba(255,255,255,.04)'}},
-        x:{ticks:{color:'#64748b',autoSkip:true,maxTicksLimit:12,font:{size:10}},grid:{display:false}}
-      }
-    }
+
+  // Groepeer per strategie
+  const byStrat = {};
+  arr.forEach(t=>{
+    const s = t.strat||'Onbekend';
+    if(!byStrat[s]) byStrat[s]={strat:s,trades:[],totalActual:0,totalBest:0,totalMissed:0,n:0};
+    const actual = +t.ru||0;
+    const btVals = Object.values(t.bt||{}).filter(v=>typeof v==='number');
+    const best   = btVals.length ? Math.max(...btVals) : null;
+    const missed = best!==null ? Math.max(0, Math.round((best-actual)*100)/100) : 0;
+    byStrat[s].trades.push({t, actual, best, missed});
+    byStrat[s].totalActual += actual;
+    byStrat[s].totalBest   += best!==null ? best : actual;
+    byStrat[s].totalMissed += missed;
+    byStrat[s].n++;
   });
-  document.getElementById('c-missed')._chart=cMissed;
+
+  const rows = Object.values(byStrat).sort((a,b)=>b.totalMissed-a.totalMissed);
+  const maxMissed = Math.max(...rows.map(r=>r.totalMissed), 0.01);
+
+  wrap.innerHTML = `
+    <div style="display:grid;grid-template-columns:minmax(80px,140px) 40px minmax(50px,70px) minmax(50px,70px) minmax(50px,70px) 1fr;gap:4px 10px;align-items:center;margin-bottom:6px;padding-bottom:6px;border-bottom:.5px solid var(--border)">
+      <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Strategie</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">#</span>
+      <span style="font-size:10px;color:var(--green);text-align:right">Werkelijk</span>
+      <span style="font-size:10px;color:rgba(139,92,246,.9);text-align:right">Best BT</span>
+      <span style="font-size:10px;color:var(--amber);text-align:right">Gemist</span>
+      <span></span>
+    </div>` +
+    rows.map(r=>{
+      const barW = Math.round(r.totalMissed/maxMissed*100);
+      const actC = r.totalActual>=0?'var(--green)':'var(--red)';
+      const btC  = r.totalBest>=0?'rgba(139,92,246,.9)':'var(--red)';
+      return `<div style="display:grid;grid-template-columns:minmax(80px,140px) 40px minmax(50px,70px) minmax(50px,70px) minmax(50px,70px) 1fr;gap:4px 10px;align-items:center;margin-bottom:8px;cursor:pointer" onclick="openMissedStratPopup('${r.strat}')">
+        <span style="font-size:12px;font-weight:600;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.strat}</span>
+        <span style="font-size:11px;color:var(--text3);text-align:right">${r.n}</span>
+        <span style="font-size:11px;font-weight:600;text-align:right;color:${actC}">${r.totalActual>=0?'+':''}${fmt(r.totalActual,1)}R</span>
+        <span style="font-size:11px;font-weight:600;text-align:right;color:${btC}">${r.totalBest>=0?'+':''}${fmt(r.totalBest,1)}R</span>
+        <span style="font-size:12px;font-weight:700;text-align:right;color:${r.totalMissed>0?'var(--amber)':'var(--text3)'}">${r.totalMissed>0?'+'+fmt(r.totalMissed,1)+'R':'—'}</span>
+        <div style="display:flex;height:10px;border-radius:3px;overflow:hidden;background:var(--bg3)">
+          <div style="width:${barW}%;background:var(--amber);border-radius:3px"></div>
+        </div>
+      </div>`;
+    }).join('');
 }
 
-function openMissedPopup(t){
-  const actual=+t.ru||0;
-  const btVals=Object.entries(t.bt||{}).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a);
-  const best=btVals.length?btVals[0]:null;
-  const missed=best?Math.round((best[1]-actual)*100)/100:0;
-  const pnlColor=actual>=0?'var(--green)':'var(--red)';
-  document.getElementById('chart-popup-title').innerHTML=
-    `${t.ticker} · ${t.date} <button class="modal-close" onclick="closeChartPopup()">×</button>`;
-  document.querySelector('#chart-popup .cw').innerHTML=`
-    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-      <div class="m" style="flex:1;min-width:90px"><div class="ml">Werkelijk RU</div><div class="mv" style="color:${pnlColor}">${actual>=0?'+':''}${fmt(actual,2)}R</div></div>
-      ${best?`<div class="m" style="flex:1;min-width:90px"><div class="ml">Best backtest</div><div class="mv" style="color:var(--blue)">${fmt(best[1],2)}R<div style="font-size:10px;color:var(--text3)">${best[0]}</div></div></div>`:''}
-      <div class="m" style="flex:1;min-width:90px"><div class="ml">Gemiste RU</div><div class="mv" style="color:${missed>0?'var(--amber)':'var(--green)'}">${missed>0?'+'+fmt(missed,2)+'R':'✓ Optimaal'}</div></div>
-    </div>
-    ${btVals.length?`<div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600">Backtest per exitstrategie</div>
-    <table style="width:100%;border-collapse:collapse">
-      <thead><tr>
-        <th style="text-align:left;padding:4px 8px;font-size:10px;color:var(--text3);border-bottom:.5px solid var(--border2)">Exit</th>
-        <th style="text-align:right;padding:4px 8px;font-size:10px;color:var(--text3);border-bottom:.5px solid var(--border2)">Backtest RU</th>
-        <th style="text-align:right;padding:4px 8px;font-size:10px;color:var(--text3);border-bottom:.5px solid var(--border2)">Verschil</th>
-      </tr></thead>
-      <tbody>${btVals.map(([ex,v])=>{const diff=Math.round((v-actual)*100)/100;const dc=diff>0?'var(--amber)':diff<0?'var(--green)':'var(--text3)';return `<tr><td style="padding:6px 8px;font-size:12px">${ex}</td><td style="padding:6px 8px;font-size:12px;font-weight:700;text-align:right;color:${v>=0?'var(--green)':'var(--red)'}">${v>=0?'+':''}${fmt(v,2)}R</td><td style="padding:6px 8px;font-size:12px;font-weight:600;text-align:right;color:${dc}">${diff>0?'+':''}${fmt(diff,2)}R</td></tr>`;}).join('')}</tbody>
-    </table>`:'<div style="color:var(--text3);font-size:12px">Geen backtest data.</div>'}
-    <div style="margin-top:12px"><button onclick="openTradeDetail(${trades.indexOf(t)});closeChartPopup()" style="font-size:12px;padding:7px 14px;border:.5px solid var(--border2);border-radius:var(--rsm);background:transparent;color:var(--text2);cursor:pointer;width:100%">📋 Volledige trade bekijken</button></div>`;
+function openMissedStratPopup(stratName){
+  let arr = getFilteredTrades().filter(t=>t.strat===stratName && Object.keys(t.bt||{}).length>0);
+  if(!arr.length) return;
+
+  const rows = arr.map(t=>{
+    const actual = +t.ru||0;
+    const btVals = Object.entries(t.bt||{}).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a);
+    const best   = btVals.length ? btVals[0] : null;
+    const missed = best ? Math.max(0, Math.round((best[1]-actual)*100)/100) : 0;
+    return {t, actual, best, missed, btVals};
+  }).sort((a,b)=>b.missed-a.missed);
+
+  const totalActual = rows.reduce((s,r)=>s+r.actual,0);
+  const totalMissed = rows.reduce((s,r)=>s+r.missed,0);
+
+  // Exit strategie analyse: gem. RU, hoe vaak beste, beter dan werkelijk%
+  const exitStats = {};
+  rows.forEach(r=>{
+    r.btVals.forEach(([ex,v])=>{
+      if(!exitStats[ex]) exitStats[ex]={name:ex,total:0,n:0,wins:0,best:0};
+      exitStats[ex].total += v;
+      exitStats[ex].n++;
+      if(v > r.actual) exitStats[ex].wins++;
+    });
+    if(r.btVals.length>0) exitStats[r.btVals[0][0]].best++;
+  });
+  const exitRows = Object.values(exitStats)
+    .map(e=>({...e, avg:Math.round(e.total/e.n*100)/100}))
+    .sort((a,b)=>b.avg-a.avg);
+  const bestExit = exitRows[0];
+
+  const exitHtml = exitRows.map((e,i)=>{
+    const avgC = e.avg>=0?'var(--green)':'var(--red)';
+    const isBest = i===0;
+    return `<div style="display:grid;grid-template-columns:1fr 40px 65px 65px 50px;gap:4px 10px;align-items:center;padding:5px 0;border-bottom:.5px solid var(--border)${isBest?";background:rgba(16,185,129,.05)":''}">
+      <span style="font-size:12px;font-weight:${isBest?'700':'400'};color:${isBest?'var(--green)':'var(--text2)'}">${e.name}${isBest?' ★':''}</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">${e.n}×</span>
+      <span style="font-size:11px;font-weight:600;text-align:right;color:${avgC}">${e.avg>=0?'+':''}${fmt(e.avg,2)}R</span>
+      <span style="font-size:11px;font-weight:700;text-align:right;color:var(--amber)">${e.best}× beste</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">${Math.round(e.wins/e.n*100)}% beter</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('chart-popup-title').innerHTML =
+    `${stratName} — Backtest analyse <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+
+  document.querySelector('#chart-popup .cw').innerHTML = `
+    <div style="overflow-y:auto;max-height:420px">
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <div class="m" style="flex:1"><div class="ml">Trades</div><div class="mv">${rows.length}</div></div>
+        <div class="m" style="flex:1"><div class="ml">Werkelijk RU</div><div class="mv ${totalActual>=0?'pos':'neg'}">${totalActual>=0?'+':''}${fmt(totalActual,1)}R</div></div>
+        <div class="m" style="flex:1"><div class="ml">Gemiste RU</div><div class="mv" style="color:var(--amber)">${totalMissed>0?'+'+fmt(totalMissed,1)+'R':'--'}</div></div>
+        ${bestExit?`<div class="m" style="flex:1;border:.5px solid rgba(16,185,129,.3)"><div class="ml">Beste exit ★</div><div class="mv" style="color:var(--green);font-size:13px">${bestExit.name}</div><div class="ms">${bestExit.avg>=0?'+':''}${fmt(bestExit.avg,2)}R gem.</div></div>`:''}
+      </div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Exit strategie vergelijking</div>
+      <div style="display:grid;grid-template-columns:1fr 40px 65px 65px 50px;gap:4px 10px;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border2)">
+        <span style="font-size:9px;color:var(--text3)">Exit</span>
+        <span style="font-size:9px;color:var(--text3);text-align:right">Trades</span>
+        <span style="font-size:9px;color:var(--text3);text-align:right">Gem. RU</span>
+        <span style="font-size:9px;color:var(--amber);text-align:right">Beste exit</span>
+        <span style="font-size:9px;color:var(--text3);text-align:right">Beter%</span>
+      </div>
+      ${exitHtml}
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 4px">Per trade (klik om te openen)</div>
+      ${rows.map(r=>`
+        <div onclick="openTradeDetail(${trades.indexOf(r.t)});closeChartPopup()" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid var(--border);cursor:pointer">
+          <span style="font-size:12px;color:var(--text2)">${r.t.ticker} <span style="color:var(--text3);font-size:11px">${fmtDate(r.t.date,true)}</span></span>
+          <div style="display:flex;gap:10px;font-size:11px">
+            <span style="color:${r.actual>=0?'var(--green)':'var(--red)'}">${r.actual>=0?'+':''}${fmt(r.actual,2)}R</span>
+            ${r.best?`<span style="color:rgba(139,92,246,.9)">${r.best[1]>=0?'+':''}${fmt(r.best[1],2)}R <span style="color:var(--text3)">${r.best[0]}</span></span>`:''}
+            <span style="color:${r.missed>0?'var(--amber)':'var(--green)'}">${r.missed>0?'+'+fmt(r.missed,2)+'R':'✓'}</span>
+          </div>
+        </div>`).join('')}
+    </div>`;
   document.getElementById('chart-popup').style.display='flex';
 }
 
