@@ -72,6 +72,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
     grid-template-columns:50px 35px 45px 1fr 55px !important;
     gap:3px 5px !important;
   }
+  /* Form: grotere touch targets op iPhone */
+  .eo{padding:13px 11px !important;min-height:44px}
+  .btn{min-height:50px !important;font-size:16px !important}
+  .star{font-size:40px !important;padding:6px !important}
+  input,select,textarea{font-size:16px !important} /* voorkomt zoom op iOS */
 }
 .strat-grid-hdr, .strat-grid-row{display:grid;grid-template-columns:minmax(80px,140px) minmax(40px,60px) minmax(50px,80px) minmax(40px,60px) minmax(50px,70px) 1fr minmax(40px,60px);gap:4px 8px;align-items:center}
 .dir-grid-hdr, .dir-grid-row{display:grid;grid-template-columns:minmax(60px,80px) minmax(40px,60px) minmax(50px,60px) 1fr minmax(50px,70px);gap:4px 8px;align-items:center}
@@ -96,11 +101,11 @@ input:focus,select:focus{border-color:var(--blue)}
 .db.long{background:var(--green-bg);color:var(--green)}
 .db.short{background:var(--red-bg);color:var(--red)}
 .db.paper-on{background:var(--paper-bg);color:var(--paper)}
-.strow{display:flex;gap:7px}
-.star{font-size:36px;cursor:pointer;color:var(--bg3);transition:color .1s;user-select:none;line-height:1}
+.strow{display:flex;gap:7px;touch-action:manipulation}
+.star{font-size:36px;cursor:pointer;color:var(--bg3);transition:color .1s;user-select:none;line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent;padding:4px}
 .star.on{color:var(--amber)}
 .eg{display:flex;flex-direction:column;gap:5px}
-.eo{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:var(--rsm);border:.5px solid var(--border);background:var(--bg3);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s}
+.eo{display:flex;align-items:center;gap:9px;padding:11px;border-radius:var(--rsm);border:.5px solid var(--border);background:var(--bg3);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .eo.sel{border-color:var(--blue);background:var(--blue-bg);color:var(--text)}
 .edot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .imgdrop{border:1.5px dashed var(--border2);border-radius:var(--rsm);padding:20px;text-align:center;cursor:pointer;font-size:13px;color:var(--text3);transition:all .15s;position:relative}
@@ -110,7 +115,7 @@ input:focus,select:focus{border-color:var(--blue)}
 .img-thumb{position:relative;width:80px;height:60px;border-radius:var(--rsm);overflow:hidden;border:.5px solid var(--border2)}
 .img-thumb img{width:100%;height:100%;object-fit:cover}
 .img-del{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:18px;height:18px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;line-height:1}
-.btn{width:100%;padding:13px;border-radius:var(--r);border:none;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn{width:100%;padding:14px;border-radius:var(--r);border:none;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .btn-primary{background:var(--green);color:#fff}
 .btn-primary:active{opacity:.8}
 .btn-secondary{background:var(--bg3);color:var(--text2);margin-bottom:9px}
@@ -1165,12 +1170,14 @@ isPaper = false;
 
 const STAR_LABELS = ['','1 ster','2 sterren','3 sterren','4 sterren','5 sterren ★★★★★'];
 document.querySelectorAll('.star').forEach(s => {
-  s.addEventListener('click', () => {
+  function handleStar(){
     starVal = +s.dataset.v;
     litStars(starVal);
     const lbl = document.getElementById('star-label');
     if(lbl) lbl.textContent = STAR_LABELS[starVal]||'';
-  });
+  }
+  s.addEventListener('click', handleStar);
+  s.addEventListener('touchend', e=>{ e.preventDefault(); handleStar(); });
 });
 function litStars(n){
   document.querySelectorAll('#stars-row .star').forEach(s => s.classList.toggle('on', +s.dataset.v <= n));
@@ -1441,6 +1448,8 @@ function fmt(v, dec=2){ return v.toLocaleString('nl-NL',{minimumFractionDigits:d
 function fmtR(v){ return (v>=0?'+':'')+fmt(v)+'R'; }
 function fmtU(v){ return (v>=0?'+':'')+'$'+fmt(Math.abs(v)); }
 function fmtUabs(v){ return '$'+fmt(Math.abs(v)); }
+// For chart axes: no + prefix, just $x or -$x
+function fmtUChart(v){ return (v<0?'-':'')+'$'+fmt(Math.abs(v)); }
 // European date format: 2026-03-17 → 17-3 (or 17-3-26 with year)
 function fmtDate(iso, showYear=false){
   if(!iso||iso.length<10) return iso||'';
@@ -1657,8 +1666,8 @@ function renderLog(){
     <div class="m"><div class="ml">Totaal P&L</div><div class="mv ${pnl>=0?'pos':'neg'}">${fmtU(pnl)}</div></div>
     <div class="m"><div class="ml">Gem. rating ★</div><div class="mv">${avgR>0?fmt(avgR,1):'-'}</div><div class="ms">/ 5 sterren</div></div>
     <div class="m"><div class="ml">Profit factor</div><div class="mv ${pfLogColor}">${pfLog}</div><div class="ms">winst/verlies</div></div>
-    <div class="m"><div class="ml">Gem. wintrade</div><div class="mv pos">${winTrades.length?'+'+fmtU(avgWinPnl):'-'}</div><div class="ms">${winTrades.length?'+'+fmt(avgWinRu,2)+'R':''}</div></div>
-    <div class="m"><div class="ml">Gem. verliestrade</div><div class="mv neg">${lossTrades.length?'-'+fmtU(avgLossPnl):'-'}</div><div class="ms">${lossTrades.length?'-'+fmt(avgLossRu,2)+'R':''}</div></div>
+    <div class="m"><div class="ml">Gem. wintrade</div><div class="mv pos">${winTrades.length?fmtU(avgWinPnl):'-'}</div><div class="ms">${winTrades.length?'+'+fmt(avgWinRu,2)+'R':''}</div></div>
+    <div class="m"><div class="ml">Gem. verliestrade</div><div class="mv neg">${lossTrades.length?'-$'+fmt(avgLossPnl,2):'-'}</div><div class="ms">${lossTrades.length?'-'+fmt(avgLossRu,2)+'R':''}</div></div>
   `;
   document.getElementById('hdr-count').textContent = trades.length+' trades';
 }
@@ -2703,7 +2712,7 @@ function renderPopupEquity(){
     data:{labels,datasets:[{label:'Cumulatief P&L',data,borderColor:color,backgroundColor:color.replace('1)','0.08)'),borderWidth:2,pointRadius:2,fill:true,tension:0.3}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'P&L: '+fmtU(ctx.raw)}}},
-      scales:{y:{ticks:{callback:v=>fmtU(v),color:'#64748b'},grid:{color:'rgba(255,255,255,.04)'}},
+      scales:{y:{ticks:{callback:v=>fmtUChart(v),color:'#64748b'},grid:{color:'rgba(255,255,255,.04)'}},
               x:{ticks:{color:'#64748b',autoSkip:true,maxTicksLimit:12},grid:{display:false}}}}
   });
 }
@@ -2920,14 +2929,14 @@ function renderEquity(sorted){
           const pnl = +t.pnl||0;
           return [
             t.ticker + ' · ' + t.date,
-            'Trade P&L: '+(pnl>=0?'+':'')+fmtU(pnl),
-            'Cumulatief: '+(ctx.parsed.y>=0?'+':'')+fmtU(ctx.parsed.y)
+            'Trade P&L: '+fmtU(pnl),
+            'Cumulatief: '+fmtU(ctx.parsed.y)
           ];
         }
       }}},
       scales:{
         y:{
-          ticks:{callback:v=>(v>=0?'+':'')+fmtU(v),color:'#64748b'},
+          ticks:{callback:v=>fmtUChart(v),color:'#64748b'},
           grid:{color:'rgba(255,255,255,.04)'}
         },
         x:{ticks:{color:'#64748b',maxRotation:0,autoSkip:true,maxTicksLimit:eqShowTickers?12:8},grid:{display:false}}
@@ -3011,7 +3020,7 @@ function renderDirBars(all){
       const bp = 100-wp-lp;
       const totVal = g.trades.reduce((s,t)=>s+(isRU?(+t.ru||0):(+t.pnl||0)),0);
       const valColor = totVal>=0?'var(--green)':'var(--red)';
-      const display = isRU?`${totVal>=0?'+':''}${fmt(totVal,1)}R`:`${totVal>=0?'+':''}${fmtU(totVal)}`;
+      const display = isRU?`${totVal>=0?'+':''}${fmt(totVal,1)}R`:`${fmtU(totVal)}`;
       return `<div style="display:grid;grid-template-columns:minmax(60px,80px) minmax(40px,60px) minmax(50px,60px) 1fr minmax(50px,70px);gap:4px 8px;align-items:center;margin-bottom:8px;cursor:pointer" class="dir-grid-row" onclick="openDirPopup('${g.key}','${isRU?'ru':'usd'}')">
         <span style="font-size:12px;font-weight:600;color:var(--text2)">${g.lbl}</span>
         <span style="font-size:11px;color:var(--text3);text-align:right">${total}</span>
@@ -3048,7 +3057,7 @@ function openDirPopup(dirKey, mode){
   const rows = sorted.map(t=>{
     const val = isRU?(+t.ru||0):(+t.pnl||0);
     const c = val>0?'var(--green)':val<0?'var(--red)':'var(--text2)';
-    const d = isRU?`${val>=0?'+':''}${fmt(val,2)}R`:`${val>=0?'+':''}${fmtU(val)}`;
+    const d = isRU?`${val>=0?'+':''}${fmt(val,2)}R`:`${fmtU(val)}`;
     return `<tr onclick="openTradeDetail(${trades.indexOf(t)});closeChartPopup()" style="cursor:pointer">
       <td style="padding:6px 8px;font-size:12px;color:var(--text3)">${t.date}</td>
       <td style="padding:6px 8px;font-size:12px;font-weight:600">${t.ticker}</td>
@@ -3151,7 +3160,7 @@ function renderRuChart(all){
           label:(ctx)=>{
             const k=keys[ctx.dataIndex];
             const p=byPeriod[k];
-            return ['RU: '+(ctx.raw>=0?'+':'')+fmt(ctx.raw,2)+'R','P&L: '+(p.pnl>=0?'+':'')+fmtU(p.pnl),'Winst: '+p.wins+' | Verlies: '+p.losses];
+            return ['RU: '+(ctx.raw>=0?'+':'')+fmt(ctx.raw,2)+'R','P&L: '+fmtU(p.pnl),'Winst: '+p.wins+' | Verlies: '+p.losses];
           }
         }}
       },
@@ -3210,7 +3219,7 @@ function renderTickerChart(all){
         <span style="font-size:12px"><span style="color:var(--green)">✓ ${totW} winst</span></span>
         ${totBe?`<span style="font-size:12px;color:var(--text3)">— ${totBe} BE</span>`:''}
         <span style="font-size:12px"><span style="color:var(--red)">✗ ${totL} verlies</span></span>
-        <span style="font-size:12px;font-weight:700;color:${totPnlColor};margin-left:auto">${totPnl>=0?'+':''}${fmtU(totPnl)}</span>
+        <span style="font-size:12px;font-weight:700;color:${totPnlColor};margin-left:auto">${fmtU(totPnl)}</span>
         <span style="font-size:12px;font-weight:700;color:${totRuColor}">${totRu>=0?'+':''}${fmt(totRu,1)}R</span>
       </div>
       <div style="text-align:center;margin-top:8px;font-size:10px;color:var(--text3)">▼ Klik op balk voor ticker detail</div>
@@ -3254,7 +3263,7 @@ function openTickerPopup(tk){
       <td style="padding:6px 8px;font-size:12px;color:var(--text3)">${t.date}</td>
       <td style="padding:6px 8px;font-size:11px;color:var(--text3)">${t.strat||'-'}</td>
       <td style="padding:6px 8px"><span class="pill ${t.dir==='Long'?'pl':'ps'}" style="font-size:10px">${t.dir==='Long'?'↑':'↓'} ${t.dir}</span></td>
-      <td style="padding:6px 8px;font-size:13px;font-weight:700;color:${c};text-align:right">${pnl>=0?'+':''}${fmtU(pnl)}</td>
+      <td style="padding:6px 8px;font-size:13px;font-weight:700;color:${c};text-align:right">${fmtU(pnl)}</td>
       <td style="padding:6px 8px;font-size:12px;font-weight:600;color:${ru>=0?'var(--green)':'var(--red)'};text-align:right">${ru>=0?'+':''}${fmt(ru,2)}R</td>
     </tr>`;
   }).join('');
@@ -3263,7 +3272,7 @@ function openTickerPopup(tk){
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <div class="m" style="flex:1;min-width:80px"><div class="ml">Trades</div><div class="mv">${sorted.length}</div></div>
       <div class="m" style="flex:1;min-width:80px"><div class="ml">Winrate</div><div class="mv ${wr>=50?'pos':'neg'}">${wr}%</div></div>
-      <div class="m" style="flex:1;min-width:80px"><div class="ml">P&L</div><div class="mv" style="color:${pnlColor}">${totPnl>=0?'+':''}${fmtU(totPnl)}</div></div>
+      <div class="m" style="flex:1;min-width:80px"><div class="ml">P&L</div><div class="mv" style="color:${pnlColor}">${fmtU(totPnl)}</div></div>
       <div class="m" style="flex:1;min-width:80px"><div class="ml">RU</div><div class="mv" style="color:${totRu>=0?'var(--green)':'var(--red)'}">${totRu>=0?'+':''}${fmt(totRu,1)}R</div></div>
     </div>
     <div style="max-height:340px;overflow-y:auto">
@@ -3595,8 +3604,8 @@ function renderWeekdayChart(all){
           </div>
           <div style="font-size:9px;color:var(--text3);margin-top:2px">${d.n} trades</div>
         </div>
-        <div style="font-size:11px;font-weight:700;text-align:right;color:${totColor}">${d.pnl>=0?'+':''}${fmtU(d.pnl)}</div>
-        <div style="font-size:10px;text-align:right;color:${avgColor}">⌀ ${d.avgPnl>=0?'+':''}${fmtU(d.avgPnl)}</div>
+        <div style="font-size:11px;font-weight:700;text-align:right;color:${totColor}">${fmtU(d.pnl)}</div>
+        <div style="font-size:10px;text-align:right;color:${avgColor}">⌀ ${fmtU(d.avgPnl)}</div>
       </div>`;
     }).join('') + '</div>';
 }
@@ -3635,8 +3644,8 @@ function renderHourChart(all){
           </div>
           <div style="font-size:9px;color:var(--text3);margin-top:2px">${d.n} trades</div>
         </div>
-        <div style="font-size:11px;font-weight:700;text-align:right;color:${totColor}">${d.pnl>=0?'+':''}${fmtU(d.pnl)}</div>
-        <div style="font-size:10px;text-align:right;color:${avgColor}">⌀ ${d.avgPnl>=0?'+':''}${fmtU(d.avgPnl)}</div>
+        <div style="font-size:11px;font-weight:700;text-align:right;color:${totColor}">${fmtU(d.pnl)}</div>
+        <div style="font-size:10px;text-align:right;color:${avgColor}">⌀ ${fmtU(d.avgPnl)}</div>
       </div>`;
     }).join('') + '</div>';
 }
