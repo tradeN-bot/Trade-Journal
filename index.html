@@ -108,7 +108,7 @@ input:focus,select:focus{border-color:var(--blue)}
 .eo{display:flex;align-items:center;gap:9px;padding:11px;border-radius:var(--rsm);border:.5px solid var(--border);background:var(--bg3);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .eo.sel{border-color:var(--blue);background:var(--blue-bg);color:var(--text)}
 .edot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.imgdrop{border:1.5px dashed var(--border2);border-radius:var(--rsm);padding:20px;text-align:center;cursor:pointer;font-size:13px;color:var(--text3);transition:all .15s;position:relative}
+.imgdrop{border:1.5px dashed var(--border2);border-radius:var(--rsm);padding:22px 20px;text-align:center;cursor:pointer;font-size:13px;color:var(--text3);transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
 .imgdrop:hover,.imgdrop.drag{border-color:var(--blue);background:var(--blue-bg)}
 .imgdrop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .img-previews{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
@@ -201,9 +201,10 @@ table.tlog tr.paper-row td{color:var(--paper)}
 .modal-close{background:none;border:none;color:var(--text2);font-size:24px;cursor:pointer;line-height:1}
 
 /* CHART POPUP */
-.chart-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px}
-.chart-modal-box{background:var(--bg2);border-radius:var(--r);width:100%;max-width:800px;padding:20px;border:.5px solid var(--border2)}
-.chart-modal-box .cw{height:400px}
+.chart-modal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:300;display:flex;align-items:center;justify-content:center;padding:12px}
+.chart-modal-box{background:var(--bg2);border-radius:var(--r);width:100%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;border:.5px solid var(--border2);overflow:hidden}
+.chart-modal-box .modal-title{padding:14px 18px 10px;border-bottom:.5px solid var(--border);flex-shrink:0;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.chart-modal-box .cw{flex:1;min-height:0;overflow-y:auto;padding:16px 18px}
 
 /* EXPORT */
 .exp-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;border-radius:var(--rsm);border:.5px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s}
@@ -299,6 +300,15 @@ input[type=range]{accent-color:var(--green);width:100%}
             <span style="font-size:10px;color:var(--text3);min-width:58px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding-top:3px">Emotie</span>
             <div class="fscroll" id="log-filter-emo" style="margin-bottom:0;padding-bottom:0;flex-wrap:wrap"></div>
           </div>
+          <!-- Row 5: Datum -->
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:10px;color:var(--text3);min-width:58px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Periode</span>
+            <div class="fscroll" id="log-filter-date" style="margin-bottom:0;padding-bottom:0"></div>
+          </div>
+          <div id="log-date-custom" style="display:none;display:flex;gap:8px;margin-left:66px;flex-wrap:wrap">
+            <div class="fg" style="margin:0;flex:1;min-width:120px"><label style="font-size:10px">Van</label><input type="date" id="log-date-from" onchange="setLogDateCustom()"></div>
+            <div class="fg" style="margin:0;flex:1;min-width:120px"><label style="font-size:10px">Tot</label><input type="date" id="log-date-to" onchange="setLogDateCustom()"></div>
+          </div>
         </div>
       </div>
       <div class="card">
@@ -392,9 +402,9 @@ input[type=range]{accent-color:var(--green);width:100%}
         </div>
         <div class="fg">
           <label>Afbeeldingen / screenshots</label>
-          <div class="imgdrop" id="img-drop" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
-            <input type="file" accept="image/*" multiple onchange="onFileChange(event)">
-            <div>📷 Sleep afbeeldingen hierheen of klik om te kiezen</div>
+          <div class="imgdrop" id="img-drop" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)" onclick="document.getElementById('f-file-input').click()">
+            <input type="file" id="f-file-input" accept="image/*" multiple style="display:none" onchange="onFileChange(event)">
+            <div>📷 Tik om foto te kiezen of sleep hierheen</div>
           </div>
           <div class="img-previews" id="img-previews"></div>
           <div class="fg" style="margin-top:8px"><label>Of screenshot link</label><input type="url" id="f-link" placeholder="https://..."></div>
@@ -682,12 +692,12 @@ input[type=range]{accent-color:var(--green);width:100%}
 
 <!-- CHART POPUP -->
 <div id="chart-popup" class="chart-modal" style="display:none" onclick="closeChartPopup(event)">
-  <div class="chart-modal-box">
+  <div class="chart-modal-box" onclick="event.stopPropagation()">
     <div class="modal-title" id="chart-popup-title">- <button class="modal-close" onclick="closeChartPopup()">×</button></div>
-    <div id="chart-popup-filters" style="display:none;padding:6px 4px 0">
+    <div id="chart-popup-filters" style="display:none;padding:8px 18px 0;flex-shrink:0">
       <div class="fscroll" id="popup-eq-dr-bar"></div>
     </div>
-    <div class="cw" style="height:380px"><canvas id="c-popup"></canvas></div>
+    <div class="cw"><canvas id="c-popup"></canvas></div>
   </div>
 </div>
 
@@ -711,6 +721,9 @@ let logFilterType = 'all';   // all | Live | Paper
 let logFilterDir  = 'all';   // all | Long | Short
 let logFilterStrat = 'all';  // all | strategie | Ja | Nee
 let logFilterEmos = [];      // [] = geen filter, anders array van geselecteerde emoties
+let logFilterDate = 'all';   // all | day | week | month | 3m | 6m | year | custom
+let logDateFrom = '';
+let logDateTo   = '';
 let dashFilterType  = 'all';  // all | Live | Paper
 let dashFilterDir   = 'all';  // all | Long | Short
 let dashFilterStrat = 'all';  // all | strategie
@@ -1316,6 +1329,11 @@ function buildLogFilters(){
   document.getElementById('log-filter-emo').innerHTML =
     `<div class="fchip on" onclick="resetLFEmo(this)">Alles</div>` +
     EMOS.map(e=>`<div class="fchip" onclick="toggleLFEmo('${e}',this)">${ESHORT[e]||e}</div>`).join('');
+
+  // Datum filter chips
+  const dateChips = [{k:'all',l:'Alles'},{k:'day',l:'Dag'},{k:'week',l:'Week'},{k:'month',l:'Maand'},{k:'3m',l:'3 maanden'},{k:'6m',l:'6 maanden'},{k:'year',l:'Jaar'},{k:'custom',l:'Eigen'}];
+  document.getElementById('log-filter-date').innerHTML =
+    dateChips.map(r=>`<div class="fchip${r.k==='all'?' on':''}" onclick="setLFDate('${r.k}',this)">${r.l}</div>`).join('');
 }
 
 function setLFType(k,el){
@@ -1361,11 +1379,29 @@ function resetLFEmo(el){
 }
 
 function resetLogFilters(){
-  logFilterType='all'; logFilterDir='all'; logFilterStrat='all'; logFilterEmos=[];
+  logFilterType='all'; logFilterDir='all'; logFilterStrat='all'; logFilterEmos=[]; logFilterDate='all'; logDateFrom=''; logDateTo='';
   document.querySelectorAll('#log-filter-type .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
   document.querySelectorAll('#log-filter-dir .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
   document.querySelectorAll('#log-filter-strat .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
   document.querySelectorAll('#log-filter-emo .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
+  document.querySelectorAll('#log-filter-date .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
+  const customEl = document.getElementById('log-date-custom');
+  if(customEl) customEl.style.display='none';
+  renderLog();
+}
+
+function setLFDate(k, el){
+  logFilterDate = k;
+  document.querySelectorAll('#log-filter-date .fchip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  const customEl = document.getElementById('log-date-custom');
+  if(customEl) customEl.style.display = k==='custom'?'flex':'none';
+  renderLog();
+}
+
+function setLogDateCustom(){
+  logDateFrom = document.getElementById('log-date-from').value;
+  logDateTo   = document.getElementById('log-date-to').value;
   renderLog();
 }
 
@@ -1386,7 +1422,7 @@ function buildDashFilters(){
     [{k:'all',l:'Alle strategieën'}].concat(STRATS.map(function(s){return{k:s,l:s};}))
     .map(function(f){ return '<div class="fchip'+(f.k==='all'?' on':'')+' " onclick="setDFStrat(\''+f.k+'\',this)">'+f.l+'</div>'; }).join('');
 
-  var ranges=[{k:'all',l:'Alles'},{k:'7d',l:'Week'},{k:'30d',l:'Maand'},{k:'90d',l:'3 maanden'},{k:'180d',l:'6 maanden'},{k:'365d',l:'Jaar'},{k:'custom',l:'Eigen periode'}];
+  var ranges=[{k:'all',l:'Alles'},{k:'1d',l:'Dag'},{k:'7d',l:'Week'},{k:'30d',l:'Maand'},{k:'90d',l:'3 maanden'},{k:'180d',l:'6 maanden'},{k:'365d',l:'Jaar'},{k:'custom',l:'Eigen periode'}];
   document.getElementById('dash-dr-bar').innerHTML=ranges.map(function(r){return '<div class="drb'+(r.k==='30d'?' on':'')+' " onclick="setDashRange(\''+r.k+'\',this)">'+r.l+'</div>';}).join('');
 
   [{id:'eq-dr-bar',items:[{k:'all',l:'Alles'},{k:'7d',l:'Week'},{k:'30d',l:'Maand'},{k:'90d',l:'3m'},{k:'180d',l:'6m'},{k:'365d',l:'Jaar'},{k:'custom',l:'Eigen'}],fn:'setEqRange',def:'all'},{id:'ru-dr-bar',items:[{k:'day',l:'Dag'},{k:'week',l:'Week'},{k:'month',l:'Maand'},{k:'half',l:'Halfj.'},{k:'year',l:'Jaar'},{k:'all',l:'Alles'},{k:'custom',l:'Eigen'}],fn:'setRuRange',def:'day'}]
@@ -1460,6 +1496,23 @@ function fmtDate(iso, showYear=false){
 function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0; }
 function stars5(n){ return '<span style="color:var(--amber)">'+'★'.repeat(n)+'</span>'+'<span style="color:var(--border2);opacity:.6">'+'★'.repeat(5-n)+'</span>'; }
 
+// Gedeeltelijke ster via SVG gradient — ondersteunt bijv. 3,8 sterren
+let _starUID = 0;
+function starsPartial(rating, size=18){
+  const uid = ++_starUID;
+  const stars = [];
+  for(let i=1;i<=5;i++){
+    const fill = Math.min(1, Math.max(0, rating - (i-1)));
+    const pct  = Math.round(fill*100);
+    const id   = `sgr${uid}_${i}`;
+    stars.push(`<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="display:inline-block;vertical-align:middle">
+      <defs><linearGradient id="${id}"><stop offset="${pct}%" stop-color="#f59e0b"/><stop offset="${pct}%" stop-color="#334155" stop-opacity="0.5"/></linearGradient></defs>
+      <path fill="url(#${id})" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+    </svg>`);
+  }
+  return stars.join('');
+}
+
 function dateOf(t){ try{ return new Date(t.date+'T00:00:00'); }catch(e){ return new Date(0); } }
 function daysAgo(n){ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-n); return d; }
 
@@ -1470,7 +1523,7 @@ function filterByDateRange(arr, range, customFrom, customTo){
     const t2=customTo?new Date(customTo+'T23:59:59'):null;
     return arr.filter(tr=>{ const d=dateOf(tr); return (!f||d>=f)&&(!t2||d<=t2); });
   }
-  const days = range==='7d'?7:range==='30d'?30:range==='90d'?90:range==='180d'?180:365;
+  const days = range==='1d'?1:range==='7d'?7:range==='30d'?30:range==='90d'?90:range==='180d'?180:365;
   const cut = daysAgo(days);
   return arr.filter(t=>dateOf(t)>=cut);
 }
@@ -1504,6 +1557,18 @@ function getFilteredLogTrades(){
     if(logFilterEmos.length > 0){
       const tEmos = t.emos || [];
       if(!logFilterEmos.every(e => tEmos.includes(e))) return false;
+    }
+
+    // Filter 5: Datum
+    if(logFilterDate !== 'all'){
+      const d = dateOf(t);
+      if(logFilterDate === 'custom'){
+        if(logDateFrom && t.date < logDateFrom) return false;
+        if(logDateTo   && t.date > logDateTo)   return false;
+      } else {
+        const days = logFilterDate==='day'?1:logFilterDate==='week'?7:logFilterDate==='month'?30:logFilterDate==='3m'?90:logFilterDate==='6m'?180:365;
+        if(d < daysAgo(days)) return false;
+      }
     }
 
     return true;
@@ -1654,18 +1719,25 @@ function renderLog(){
   const lossPnlLog = lossTrades.reduce((s,t)=>s+Math.abs(+t.pnl||0),0);
   const pfLog = lossPnlLog>0 ? fmt(winPnlLog/lossPnlLog,2) : (winPnlLog>0?'∞':'-');
   const pfLogColor = lossPnlLog>0?(winPnlLog/lossPnlLog>=1?'pos':'neg'):'';
+  const {rr: logRR, rrTooltip: logRRTooltip} = calcRR(list);
   // Gem. wintrade / verliestrade
   const avgWinPnl  = winTrades.length  ? winPnlLog/winTrades.length   : 0;
   const avgLossPnl = lossTrades.length ? lossPnlLog/lossTrades.length : 0;
   const avgWinRu   = winTrades.length  ? winTrades.reduce((s,t)=>s+(+t.ru||0),0)/winTrades.length   : 0;
   const avgLossRu  = lossTrades.length ? lossTrades.reduce((s,t)=>s+Math.abs(+t.ru||0),0)/lossTrades.length : 0;
+  const {exp, expStr} = calcExpectancy(list);
+  const {rollingStr, count: rollingCount} = calcRollingExpectancy(list, 20);
+  const expColor = exp===null?'':exp>=0?'pos':'neg';
   document.getElementById('log-kpis').innerHTML = `
     <div class="m"><div class="ml">Trades</div><div class="mv">${list.length}</div></div>
     <div class="m"><div class="ml">Winrate</div><div class="mv ${wr>=50?'pos':'neg'}">${wr}%</div><div class="ms">${wins} winst</div></div>
     <div class="m"><div class="ml">Totaal RU</div><div class="mv ${ru>=0?'pos':'neg'}">${fmtR(ru)}</div></div>
     <div class="m"><div class="ml">Totaal P&L</div><div class="mv ${pnl>=0?'pos':'neg'}">${fmtU(pnl)}</div></div>
-    <div class="m"><div class="ml">Gem. rating ★</div><div class="mv">${avgR>0?fmt(avgR,1):'-'}</div><div class="ms">/ 5 sterren</div></div>
+    <div class="m"><div class="ml">Gem. rating</div><div class="mv" style="font-size:13px;line-height:1.3">${avgR>0?starsPartial(avgR,14):'-'}<div style="font-size:11px;color:var(--text3);margin-top:2px">${avgR>0?fmt(avgR,1)+' / 5':'-'}</div></div></div>
     <div class="m"><div class="ml">Profit factor</div><div class="mv ${pfLogColor}">${pfLog}</div><div class="ms">winst/verlies</div></div>
+    <div class="m" title="${logRRTooltip}"><div class="ml">Gem. R:R</div><div class="mv">${logRR}</div><div class="ms">${riskEntries.length?'risk periodes':'win/verlies RU'}</div></div>
+    <div class="m" title="(Winrate × Gem. win RU) − (Lossrate × Gem. verlies RU)"><div class="ml">Expectancy</div><div class="mv ${expColor}">${expStr}</div><div class="ms">R per trade</div></div>
+    <div class="m" title="Gem. R van de laatste ${rollingCount} trades"><div class="ml">Rolling exp.</div><div class="mv ${rollingStr.startsWith('+')?'pos':'neg'}">${rollingStr}</div><div class="ms">laatste ${rollingCount} trades</div></div>
     <div class="m"><div class="ml">Gem. wintrade</div><div class="mv pos">${winTrades.length?fmtU(avgWinPnl):'-'}</div><div class="ms">${winTrades.length?'+'+fmt(avgWinRu,2)+'R':''}</div></div>
     <div class="m"><div class="ml">Gem. verliestrade</div><div class="mv neg">${lossTrades.length?'-$'+fmt(avgLossPnl,2):'-'}</div><div class="ms">${lossTrades.length?'-'+fmt(avgLossRu,2)+'R':''}</div></div>
   `;
@@ -2503,8 +2575,8 @@ function openEdit(i){
       <div class="imgdrop" id="e-img-drop"
         ondragover="eImgDragOver(event)" ondragleave="eImgDragLeave(event)" ondrop="eImgDrop(event)"
         onclick="document.getElementById('e-img-input').click()">
-        <input type="file" id="e-img-input" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" onchange="eImgFileChange(event)">
-        <div>📷 Sleep afbeeldingen hierheen of klik om toe te voegen</div>
+        <input type="file" id="e-img-input" accept="image/*" multiple style="display:none" onchange="eImgFileChange(event)">
+        <div>📷 Tik om foto te kiezen of sleep hierheen</div>
       </div>
       <div class="img-previews" id="e-img-previews"></div>
     </div>
@@ -2522,7 +2594,12 @@ function editSetStar(v){ editStarVal=v; document.querySelectorAll('#e-stars-row 
 function eImgDragOver(e){ e.preventDefault(); document.getElementById('e-img-drop').classList.add('drag'); }
 function eImgDragLeave(){ document.getElementById('e-img-drop').classList.remove('drag'); }
 function eImgDrop(e){ e.preventDefault(); eImgDragLeave(); eHandleFiles(e.dataTransfer.files); }
-function eImgFileChange(e){ eHandleFiles(e.target.files); }
+function eImgFileChange(e){
+  const files = e.target.files;
+  if(!files || files.length === 0) return;
+  eHandleFiles(files);
+  e.target.value = '';
+}
 function eHandleFiles(files){
   [...files].forEach(f=>{
     if(!f.type.startsWith('image/')) return;
@@ -2637,7 +2714,13 @@ function closeBtModal(e){ if(!e||e.target===document.getElementById('bt-modal'))
 function onDragOver(e){ e.preventDefault(); document.getElementById('img-drop').classList.add('drag'); }
 function onDragLeave(){ document.getElementById('img-drop').classList.remove('drag'); }
 function onDrop(e){ e.preventDefault(); onDragLeave(); handleFiles(e.dataTransfer.files); }
-function onFileChange(e){ handleFiles(e.target.files); }
+function onFileChange(e){
+  const files = e.target.files;
+  if(!files || files.length === 0) return;
+  handleFiles(files);
+  // Reset input so same file can be selected again on iOS
+  e.target.value = '';
+}
 function handleFiles(files){
   [...files].forEach(f=>{
     if(!f.type.startsWith('image/')) return;
@@ -2662,6 +2745,7 @@ let popupEqTickers = false;
 
 function openChartModal(chartId, title){
   document.getElementById('chart-popup-title').innerHTML = title+' <button class="modal-close" onclick="closeChartPopup()">×</button>';
+  document.getElementById('chart-popup-filters').style.display='none';
   document.getElementById('chart-popup').style.display='flex';
 
   const filtersEl = document.getElementById('chart-popup-filters');
@@ -2722,6 +2806,72 @@ function cloneChart(c){
   return new Chart(document.getElementById('c-popup'),{ type:c.config.type, data:JSON.parse(JSON.stringify(c.config.data)), options:JSON.parse(JSON.stringify(c.config.options||{})) });
 }
 
+
+// Shared R:R berekening — geeft {rr, rrTooltip, rrNum}
+// rr = weergavetekst bijv "1:1,69"
+// rrTooltip = uitleg van de berekening
+// rrNum = numerieke waarde (de rechter kant), bijv 1.69
+function calcRR(trades){
+  const winTrades  = trades.filter(t=>+t.pnl>0);
+  const lossTrades = trades.filter(t=>+t.pnl<0);
+  const winRUs  = winTrades.map(t=>+t.ru||0);
+  const lossRUs = lossTrades.map(t=>Math.abs(+t.ru||0));
+  const avgWinRU  = avg(winRUs);
+  const avgLossRU = avg(lossRUs);
+  let rr = '-', rrTooltip = 'gem. win RU / gem. verlies RU', rrNum = null;
+
+  if(riskEntries.length > 0){
+    const tradeRUs = trades.map(t=>{
+      const risk = getRiskForDate(t.date);
+      if(!risk || risk===0) return null;
+      return {ru: +t.pnl / risk, win: +t.pnl > 0};
+    }).filter(x=>x!==null);
+    const wR = tradeRUs.filter(x=>x.win).map(x=>x.ru);
+    const lR = tradeRUs.filter(x=>!x.win).map(x=>Math.abs(x.ru));
+    if(wR.length && lR.length){
+      rrNum = avg(wR) / avg(lR);
+      rr = '1:' + fmt(rrNum, 2);
+      rrTooltip = 'op basis van ingestelde risk periodes';
+    }
+  } else if(avgLossRU > 0 && avgWinRU > 0){
+    rrNum = avgWinRU / avgLossRU;
+    rr = '1:' + fmt(rrNum, 2);
+    rrTooltip = 'gem. win RU / gem. verlies RU';
+  }
+  return {rr, rrTooltip, rrNum};
+}
+
+// Expectancy = (Winrate × Gemiddelde win RU) − (Lossrate × Gemiddelde loss RU)
+// Winrate  = winnende trades / totaal trades
+// Lossrate = verliezende trades / totaal trades
+// Gem. win RU  = gemiddelde RU van winnende trades
+// Gem. loss RU = gemiddelde RU (abs) van verliezende trades
+function calcExpectancy(trades){
+  if(!trades.length) return {exp: null, expStr: '—'};
+  const n      = trades.length;
+  const wins   = trades.filter(t=>+t.pnl > 0);
+  const losses = trades.filter(t=>+t.pnl < 0);
+  if(!wins.length && !losses.length) return {exp: null, expStr: '—'};
+  const winRate  = wins.length   / n;
+  const lossRate = losses.length / n;
+  const avgWinR  = wins.length   ? avg(wins.map(t=>+t.ru||0))             : 0;
+  const avgLossR = losses.length ? avg(losses.map(t=>Math.abs(+t.ru||0))) : 0;
+  const exp = Math.round((winRate * avgWinR - lossRate * avgLossR) * 100) / 100;
+  const expStr = (exp >= 0 ? '+' : '') + fmt(exp, 2) + 'R';
+  return {exp, expStr};
+}
+
+// Rolling expectancy: gem. R van de laatste N trades
+function calcRollingExpectancy(allTrades, n=20){
+  const sorted = [...allTrades].sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+  const last = sorted.slice(-n).filter(t=>+t.ru!==0||+t.pnl!==0);
+  if(!last.length) return {rolling: null, rollingStr: '—', count: 0};
+  const totalR = last.reduce((s,t)=>s+(+t.ru||0), 0);
+  const rolling = Math.round(totalR/last.length*100)/100;
+  const rollingStr = (rolling>=0?'+':'') + fmt(rolling,2) + 'R';
+  return {rolling, rollingStr, count: last.length};
+}
+
 // ============================================================
 //  DASHBOARD
 // ============================================================
@@ -2745,28 +2895,14 @@ function renderDash(){
   const winRUs = all.filter(t=>+t.ru>0).map(t=>+t.ru);
   const lossRUs = all.filter(t=>+t.ru<0).map(t=>Math.abs(+t.ru));
   const avgWinRU = avg(winRUs); const avgLossRU = avg(lossRUs);
+  const {rr, rrTooltip} = calcRR(all);
+  const {exp, expStr} = calcExpectancy(all);
+  const {rollingStr, count: rollingCount} = calcRollingExpectancy(all, 20);
+  const expColor = exp===null?'':exp>=0?'pos':'neg';
 
-  // R:R berekening op basis van risk periodes
-  // Als risk periodes ingesteld: gem. RU per winnende trade / gem. RU per verliezende trade
-  // Als geen periodes: fallback op avgWin/avgLoss in USD
-  let rr = '-';
-  let rrTooltip = 'gem. win RU / gem. verlies RU';
-  if(riskEntries.length > 0){
-    // Bereken RU per trade op basis van geldende risk
-    const tradeRUs = all.map(function(t){
-      const risk = getRiskForDate(t.date);
-      if(!risk) return null;
-      return {ru: t.pnl / risk, win: t.pnl > 0};
-    }).filter(function(x){ return x !== null; });
-    const winRUsR = tradeRUs.filter(function(x){ return x.win; }).map(function(x){ return x.ru; });
-    const lossRUsR = tradeRUs.filter(function(x){ return !x.win; }).map(function(x){ return Math.abs(x.ru); });
-    if(winRUsR.length && lossRUsR.length){
-      rr = '1:' + fmt(avg(winRUsR) / avg(lossRUsR), 2);
-      rrTooltip = 'op basis van ingestelde risk periodes';
-    }
-  } else if(avgLossRU > 0 && avgWinRU > 0){
-    rr = '1:' + fmt(avgWinRU / avgLossRU, 2);
-  }
+  // Sterren weergave: gevuld getal + sterren symbolen
+  const ratingInt = avgRating > 0 ? Math.round(avgRating * 10) / 10 : 0;
+  const ratingStars = avgRating > 0 ? starsPartial(avgRating, 16) : '—';
 
   const profitFactor = winPnls.length&&lossPnls.length?fmt(winPnls.reduce((a,b)=>a+b,0)/lossPnls.reduce((a,b)=>a+b,0),2):'-';
   const maxDD = calcMaxDrawdown(sorted, startBalance);
@@ -2779,11 +2915,13 @@ function renderDash(){
     <div class="m"><div class="ml">Winrate</div><div class="mv ${wr>=50?'pos':'neg'}">${wr}%</div><div class="ms">${wins}/${all.length}</div></div>
     <div class="m" title="${rrTooltip}"><div class="ml">Gem. R:R</div><div class="mv">${rr}</div><div class="ms">${riskEntries.length?'risk periodes':'win/verlies RU'}</div></div>
     <div class="m"><div class="ml">Totaal RU</div><div class="mv ${totalRU>=0?'pos':'neg'}">${fmtR(totalRU)}</div></div>
-    <div class="m"><div class="ml">Gem. rating ★</div><div class="mv">${avgRating>0?fmt(avgRating,1):'-'}</div></div>
+    <div class="m"><div class="ml">Gem. rating</div><div class="mv" style="font-size:14px;line-height:1.2">${ratingStars}<div style="font-size:11px;color:var(--text3);margin-top:2px">${ratingInt>0?ratingInt+' / 5':'-'}</div></div></div>
     <div class="m"><div class="ml">Trades/dag</div><div class="mv">${avgT}</div><div class="ms">${days} dagen</div></div>
     <div class="m"><div class="ml">P&amp;L Totaal</div><div class="mv ${totalPnl>=0?'pos':'neg'}">${fmtU(totalPnl)}</div><div class="ms">balans $${fmt(bal,0)}</div></div>
     <div class="m"><div class="ml">Profit factor</div><div class="mv">${profitFactor}</div></div>
     <div class="m"><div class="ml">Max drawdown</div><div class="mv neg">-$${fmt(maxDD,0)}</div></div>
+    <div class="m" title="(Winrate × Gem. win RU) − (Lossrate × Gem. verlies RU)"><div class="ml">Expectancy</div><div class="mv ${expColor}">${expStr}</div><div class="ms">R per trade</div></div>
+    <div class="m" title="Gem. R van de laatste ${rollingCount} trades"><div class="ml">Rolling exp.</div><div class="mv ${rollingStr.startsWith('+')?'pos':'neg'}">${rollingStr}</div><div class="ms">laatste ${rollingCount} trades</div></div>
   `;
 
   document.getElementById('pnl-stats').innerHTML = `
@@ -2958,20 +3096,22 @@ function renderStratChart(all){
     const winPnl  = ts.filter(t=>+t.pnl>0).reduce((a,t)=>a+(+t.pnl||0),0);
     const lossPnl = ts.filter(t=>+t.pnl<0).reduce((a,t)=>a+Math.abs(+t.pnl||0),0);
     const pf = lossPnl>0 ? Math.round(winPnl/lossPnl*100)/100 : (winPnl>0?'∞':'-');
-    return {s, ts, w, l, be, totalRU, avgRU, n:ts.length, pf};
+    const {exp, expStr} = calcExpectancy(ts);
+    return {s, ts, w, l, be, totalRU, avgRU, n:ts.length, pf, exp, expStr};
   }).filter(d=>d.n>0);
 
   if(!data.length){ el.innerHTML='<div class="empty" style="padding:1rem">Geen data.</div>'; return; }
-  // Column layout: name | trades | gem RU | PF | totaal RU | bar+WL
+  // Column layout: name | trades | gem RU | PF | exp | totaal RU | bar | WL
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:minmax(80px,140px) minmax(40px,60px) minmax(50px,80px) minmax(40px,60px) minmax(50px,70px) 1fr minmax(40px,60px);gap:4px 8px;align-items:center;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border)" class="strat-grid-hdr">
+    <div style="display:grid;grid-template-columns:minmax(80px,140px) minmax(40px,55px) minmax(50px,75px) minmax(40px,55px) minmax(50px,65px) minmax(50px,65px) 1fr minmax(40px,55px);gap:4px 6px;align-items:center;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border)" class="strat-grid-hdr">
       <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Strategie</span>
-      <span style="font-size:10px;color:var(--text3);text-align:right">Trades</span>
+      <span style="font-size:10px;color:var(--text3);text-align:right">#</span>
       <span style="font-size:10px;color:var(--text3);text-align:right">Gem. RU</span>
       <span style="font-size:10px;color:var(--text3);text-align:right">PF</span>
+      <span style="font-size:10px;color:var(--blue);text-align:right">Exp.</span>
       <span style="font-size:10px;color:var(--text3);text-align:right">Totaal</span>
       <span></span>
-      <span style="font-size:10px;color:var(--text3);text-align:center">W / L</span>
+      <span style="font-size:10px;color:var(--text3);text-align:center">W/L</span>
     </div>` +
   data.map(d=>{
     const total = d.w+d.l;
@@ -2979,12 +3119,14 @@ function renderStratChart(all){
     const lp = 100-wp;
     const ruColor = d.totalRU>=0?'var(--green)':'var(--red)';
     const pfColor = typeof d.pf==='number'?(d.pf>=1?'var(--green)':'var(--red)'):'var(--text3)';
-    return `<div style="display:grid;grid-template-columns:minmax(80px,140px) minmax(40px,60px) minmax(50px,80px) minmax(40px,60px) minmax(50px,70px) 1fr minmax(40px,60px);gap:4px 8px;align-items:center;margin-bottom:7px" class="strat-grid-row">
+    const expColor = d.exp===null?'var(--text3)':d.exp>=0?'var(--green)':'var(--red)';
+    return `<div style="display:grid;grid-template-columns:minmax(80px,140px) minmax(40px,55px) minmax(50px,75px) minmax(40px,55px) minmax(50px,65px) minmax(50px,65px) 1fr minmax(40px,55px);gap:4px 6px;align-items:center;margin-bottom:7px" class="strat-grid-row">
       <span style="font-size:12px;font-weight:600;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.s}</span>
       <span style="font-size:11px;color:var(--text3);text-align:right">${d.n}</span>
       <span style="font-size:11px;font-weight:600;text-align:right;color:${d.avgRU>=0?'var(--green)':'var(--red)'}">${d.avgRU>=0?'+':''}${fmt(d.avgRU,2)}R</span>
       <span style="font-size:11px;font-weight:600;text-align:right;color:${pfColor}">${typeof d.pf==='number'?d.pf.toFixed(2):d.pf}</span>
-      <span style="font-size:12px;font-weight:700;text-align:right;color:${ruColor}">${d.totalRU>=0?'+':''}${fmt(d.totalRU,1)}R</span>
+      <span style="font-size:11px;font-weight:700;text-align:right;color:${expColor}" title="Expectancy">${d.expStr}</span>
+      <span style="font-size:11px;font-weight:700;text-align:right;color:${ruColor};white-space:nowrap">${d.totalRU>=0?'+':''}${fmt(d.totalRU,1)}R</span>
       <div style="display:flex;height:14px;border-radius:4px;overflow:hidden;gap:1px">
         <div style="width:${wp}%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${wp>=10?wp+'%':''}</div>
         <div style="width:${lp}%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${lp>=10?lp+'%':''}</div>
@@ -3083,6 +3225,7 @@ function openDirPopup(dirKey, mode){
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+  document.getElementById('chart-popup-filters').style.display='none';
   document.getElementById('chart-popup').style.display='flex';
 }
 
@@ -3167,6 +3310,12 @@ function renderRuChart(all){
       scales:{
         y:{ticks:{callback:v=>(v>=0?'+':'')+fmt(v,1)+'R',color:'#64748b'},grid:{color:'rgba(255,255,255,.04)'}},
         x:{ticks:{color:'#64748b',autoSkip:true,maxTicksLimit:16,maxRotation:0},grid:{display:false}}
+      },
+      onClick:(evt,els)=>{
+        if(!els.length) return;
+        const k = keys[els[0].index];
+        const periodTrades = arr.filter(t=>getKey(t.date)===k);
+        openTradeListPopup(fmtKey(k), periodTrades);
       }
     }
   });
@@ -3287,6 +3436,7 @@ function openTickerPopup(tk){
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+  document.getElementById('chart-popup-filters').style.display='none';
   document.getElementById('chart-popup').style.display='flex';
 }
 
@@ -3302,8 +3452,6 @@ function renderEmoChart(all){
     const wp  = Math.round(w/tot*100);
     const lp  = 100-wp;
 
-    // Gemiste RU: per trade het verschil tussen beste backtest en werkelijke RU
-    // Als geen backtest: tel de verlies-RU van die trades op als indicatie
     let missedRU = 0;
     ts.forEach(t=>{
       const actual = +t.ru||0;
@@ -3312,26 +3460,27 @@ function renderEmoChart(all){
         const best = Math.max(...btVals);
         if(best > actual) missedRU += Math.round((best-actual)*100)/100;
       } else if(actual < 0){
-        // Geen backtest: verlies-trades tellen als gemiste RU
         missedRU += Math.abs(actual);
       }
     });
     missedRU = Math.round(missedRU*100)/100;
 
-    return {e, tot, wp, lp, missedRU};
+    const {exp, expStr} = calcExpectancy(ts);
+
+    return {e, tot, wp, lp, missedRU, exp, expStr};
   }).filter(Boolean);
 
   if(!rows.length){ el.innerHTML='<div class="empty" style="padding:1rem">Geen data.</div>'; return; }
 
-  // Header
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;padding:0 0 6px;border-bottom:.5px solid var(--border);margin-bottom:6px">
+    <div style="display:grid;grid-template-columns:1fr minmax(70px,90px) minmax(60px,70px) minmax(65px,80px);gap:6px;padding:0 0 6px;border-bottom:.5px solid var(--border);margin-bottom:6px">
       <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Emotie / gedrag</div>
-      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;text-align:right;min-width:80px">Winst/verlies</div>
-      <div style="font-size:10px;color:var(--amber);text-transform:uppercase;letter-spacing:.05em;text-align:right;min-width:72px">Gemiste RU</div>
+      <div style="font-size:10px;color:var(--text3);text-align:right">Winst/verlies</div>
+      <div style="font-size:10px;color:var(--blue);text-align:right">Exp.</div>
+      <div style="font-size:10px;color:var(--amber);text-align:right">Gemiste RU</div>
     </div>` +
-    rows.map(({e, tot, wp, lp, missedRU})=>`
-    <div class="ec-item" style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;margin-bottom:8px">
+    rows.map(({e, tot, wp, lp, missedRU, exp, expStr})=>`
+    <div class="ec-item" style="display:grid;grid-template-columns:1fr minmax(70px,90px) minmax(60px,70px) minmax(65px,80px);gap:6px;align-items:center;margin-bottom:8px;cursor:pointer" onclick="openEmoPopup('${e.replace(/'/g,"\\'")}')">
       <div>
         <div class="ec-name" style="margin-bottom:3px">${ESHORT[e]} <span style="color:var(--text3);font-size:10px">(${tot}×)</span></div>
         <div class="ec-bars" style="margin:0">
@@ -3339,13 +3488,53 @@ function renderEmoChart(all){
           <div class="sc-red" style="width:${lp}%">${lp>=15?lp+'%':''}</div>
         </div>
       </div>
-      <div style="font-size:11px;text-align:right;min-width:80px;color:var(--text3)">
+      <div style="font-size:11px;text-align:right;color:var(--text3)">
         <span style="color:var(--green)">${wp}%</span> / <span style="color:var(--red)">${lp}%</span>
       </div>
-      <div style="font-size:12px;font-weight:700;text-align:right;min-width:72px;color:${missedRU>0?'var(--amber)':'var(--text3)'}">
+      <div style="font-size:11px;font-weight:700;text-align:right;color:${exp===null?'var(--text3)':exp>=0?'var(--green)':'var(--red)'}" title="Expectancy: verwachte R per trade">
+        ${expStr}
+      </div>
+      <div style="font-size:12px;font-weight:700;text-align:right;color:${missedRU>0?'var(--amber)':'var(--text3)'}">
         ${missedRU>0?'+'+fmt(missedRU,1)+'R':'—'}
       </div>
     </div>`).join('');
+}
+
+function openEmoPopup(emo){
+  const all = getFilteredTrades();
+  const ts = all.filter(t=>(t.emos||[]).includes(emo));
+  if(!ts.length) return;
+  const wins   = ts.filter(t=>+t.pnl>0);
+  const losses = ts.filter(t=>+t.pnl<0);
+  const totalPnl = ts.reduce((s,t)=>s+(+t.pnl||0),0);
+  const totalRu  = ts.reduce((s,t)=>s+(+t.ru||0),0);
+  const {exp, expStr} = calcExpectancy(ts);
+  const sorted = [...ts].sort((a,b)=>b.date.localeCompare(a.date));
+
+  document.getElementById('chart-popup-filters').style.display='none';
+  document.getElementById('chart-popup-title').innerHTML =
+    `${ESHORT[emo]||emo} <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+  document.querySelector('#chart-popup .cw').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="m" style="flex:1"><div class="ml">Trades</div><div class="mv">${ts.length}</div></div>
+      <div class="m" style="flex:1"><div class="ml">Winrate</div><div class="mv ${wins.length/ts.length>=.5?'pos':'neg'}">${Math.round(wins.length/ts.length*100)}%</div><div class="ms">${wins.length}W ${losses.length}L</div></div>
+      <div class="m" style="flex:1"><div class="ml">Totaal RU</div><div class="mv ${totalRu>=0?'pos':'neg'}">${totalRu>=0?'+':''}${fmt(totalRu,2)}R</div></div>
+      <div class="m" style="flex:1"><div class="ml">Totaal P&L</div><div class="mv ${totalPnl>=0?'pos':'neg'}">${fmtU(totalPnl)}</div></div>
+      <div class="m" style="flex:1"><div class="ml">Expectancy</div><div class="mv ${exp===null?'':exp>=0?'pos':'neg'}">${expStr}</div></div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Trades (klik om te openen)</div>
+    ${sorted.map(t=>{
+      const idx = trades.indexOf(t);
+      const pnlC = +t.pnl>0?'var(--green)':+t.pnl<0?'var(--red)':'var(--text3)';
+      return `<div onclick="openTradeDetail(${idx});closeChartPopup()" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid var(--border);cursor:pointer">
+        <span style="font-size:12px;color:var(--text2)">${t.ticker} <span style="color:var(--text3);font-size:11px">${fmtDate(t.date,true)}</span> <span style="font-size:10px;color:var(--text3)">${t.strat}</span></span>
+        <div style="display:flex;gap:10px;font-size:11px">
+          <span style="color:${pnlC}">${fmtU(+t.pnl||0)}</span>
+          <span style="color:${+t.ru>=0?'var(--green)':'var(--red)'}">${+t.ru>=0?'+':''}${fmt(+t.ru||0,2)}R</span>
+        </div>
+      </div>`;
+    }).join('')}`;
+  document.getElementById('chart-popup').style.display='flex';
 }
 
 function renderPlanCompare(all){
@@ -3510,7 +3699,7 @@ function openMissedStratPopup(stratName){
   const exitHtml = exitRows.map((e,i)=>{
     const avgC = e.avg>=0?'var(--green)':'var(--red)';
     const isBest = i===0;
-    return `<div style="display:grid;grid-template-columns:1fr 40px 65px 65px 50px;gap:4px 10px;align-items:center;padding:5px 0;border-bottom:.5px solid var(--border)${isBest?";background:rgba(16,185,129,.05)":''}">
+    return `<div style="display:grid;grid-template-columns:1fr minmax(35px,50px) minmax(55px,70px) minmax(55px,75px) minmax(45px,60px);gap:4px 8px;align-items:center;padding:6px 0;border-bottom:.5px solid var(--border)${isBest?";background:rgba(16,185,129,.05)":''}">
       <span style="font-size:12px;font-weight:${isBest?'700':'400'};color:${isBest?'var(--green)':'var(--text2)'}">${e.name}${isBest?' ★':''}</span>
       <span style="font-size:10px;color:var(--text3);text-align:right">${e.n}×</span>
       <span style="font-size:11px;font-weight:600;text-align:right;color:${avgC}">${e.avg>=0?'+':''}${fmt(e.avg,2)}R</span>
@@ -3523,7 +3712,7 @@ function openMissedStratPopup(stratName){
     `${stratName} — Backtest analyse <button class="modal-close" onclick="closeChartPopup()">×</button>`;
 
   document.querySelector('#chart-popup .cw').innerHTML = `
-    <div style="overflow-y:auto;max-height:420px">
+    <div>
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
         <div class="m" style="flex:1"><div class="ml">Trades</div><div class="mv">${rows.length}</div></div>
         <div class="m" style="flex:1"><div class="ml">Werkelijk RU</div><div class="mv ${totalActual>=0?'pos':'neg'}">${totalActual>=0?'+':''}${fmt(totalActual,1)}R</div></div>
@@ -3531,7 +3720,7 @@ function openMissedStratPopup(stratName){
         ${bestExit?`<div class="m" style="flex:1;border:.5px solid rgba(16,185,129,.3)"><div class="ml">Beste exit ★</div><div class="mv" style="color:var(--green);font-size:13px">${bestExit.name}</div><div class="ms">${bestExit.avg>=0?'+':''}${fmt(bestExit.avg,2)}R gem.</div></div>`:''}
       </div>
       <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Exit strategie vergelijking</div>
-      <div style="display:grid;grid-template-columns:1fr 40px 65px 65px 50px;gap:4px 10px;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border2)">
+      <div style="display:grid;grid-template-columns:1fr minmax(35px,50px) minmax(55px,70px) minmax(55px,75px) minmax(45px,60px);gap:4px 8px;margin-bottom:4px;padding-bottom:4px;border-bottom:.5px solid var(--border2)">
         <span style="font-size:9px;color:var(--text3)">Exit</span>
         <span style="font-size:9px;color:var(--text3);text-align:right">Trades</span>
         <span style="font-size:9px;color:var(--text3);text-align:right">Gem. RU</span>
@@ -3550,6 +3739,7 @@ function openMissedStratPopup(stratName){
           </div>
         </div>`).join('')}
     </div>`;
+  document.getElementById('chart-popup-filters').style.display='none';
   document.getElementById('chart-popup').style.display='flex';
 }
 
@@ -3568,6 +3758,55 @@ function renderStreaks(all){
     <div class="m"><div class="ml">Beste dag</div><div class="mv pos">${fmtU(bestDay)}</div></div>
     <div class="m"><div class="ml">Slechtste dag</div><div class="mv neg">${fmtU(worstDay)}</div></div>
   `;
+}
+
+function openDayPopup(dayIdx){
+  const all = getFilteredTrades();
+  const DAYNAMES = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
+  const ts = all.filter(t=>dateOf(t).getDay()===dayIdx);
+  openTradeListPopup(DAYNAMES[dayIdx], ts);
+}
+
+function openHourPopup(hour){
+  const all = getFilteredTrades();
+  const ts = all.filter(t=>parseInt((t.time||'09:00').split(':')[0])===hour);
+  openTradeListPopup(`${hour}:00 – ${hour+1}:00`, ts);
+}
+
+function openTradeListPopup(title, ts){
+  if(!ts.length) return;
+  const wins   = ts.filter(t=>+t.pnl>0);
+  const losses = ts.filter(t=>+t.pnl<0);
+  const totalPnl = ts.reduce((s,t)=>s+(+t.pnl||0),0);
+  const totalRu  = ts.reduce((s,t)=>s+(+t.ru||0),0);
+  const {expStr} = calcExpectancy(ts);
+  const sorted = [...ts].sort((a,b)=>b.date.localeCompare(a.date));
+
+  document.getElementById('chart-popup-filters').style.display='none';
+  document.getElementById('chart-popup-title').innerHTML =
+    `${title} <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+  document.querySelector('#chart-popup .cw').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="m" style="flex:1"><div class="ml">Trades</div><div class="mv">${ts.length}</div></div>
+      <div class="m" style="flex:1"><div class="ml">Winrate</div><div class="mv ${wins.length/ts.length>=.5?'pos':'neg'}">${Math.round(wins.length/ts.length*100)}%</div><div class="ms">${wins.length}W ${losses.length}L</div></div>
+      <div class="m" style="flex:1"><div class="ml">Totaal RU</div><div class="mv ${totalRu>=0?'pos':'neg'}">${totalRu>=0?'+':''}${fmt(totalRu,2)}R</div></div>
+      <div class="m" style="flex:1"><div class="ml">Totaal P&L</div><div class="mv ${totalPnl>=0?'pos':'neg'}">${fmtU(totalPnl)}</div></div>
+      <div class="m" style="flex:1"><div class="ml">Expectancy</div><div class="mv">${expStr}</div></div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Trades (klik om te openen)</div>
+    ${sorted.map(t=>{
+      const idx = trades.indexOf(t);
+      const pnlC = +t.pnl>0?'var(--green)':+t.pnl<0?'var(--red)':'var(--text3)';
+      return `<div onclick="openTradeDetail(${idx});closeChartPopup()" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid var(--border);cursor:pointer">
+        <span style="font-size:12px;color:var(--text2)">${t.ticker} <span style="color:var(--text3);font-size:11px">${fmtDate(t.date,true)} ${t.time||''}</span></span>
+        <span style="font-size:11px;color:var(--text3)">${t.strat}</span>
+        <div style="display:flex;gap:10px;font-size:11px">
+          <span style="color:${pnlC}">${fmtU(+t.pnl||0)}</span>
+          <span style="color:${+t.ru>=0?'var(--green)':'var(--red)'}">${+t.ru>=0?'+':''}${fmt(+t.ru||0,2)}R</span>
+        </div>
+      </div>`;
+    }).join('')}`;
+  document.getElementById('chart-popup').style.display='flex';
 }
 
 function renderWeekdayChart(all){
@@ -3594,7 +3833,7 @@ function renderWeekdayChart(all){
       const bp = 100-wp-lp;
       const totColor = d.pnl>=0?'var(--green)':'var(--red)';
       const avgColor = d.avgPnl>=0?'var(--green)':'var(--red)';
-      return `<div style="display:grid;grid-template-columns:28px 1fr 64px 64px;align-items:center;gap:6px">
+      return `<div style="display:grid;grid-template-columns:28px 1fr 64px 64px;align-items:center;gap:6px;cursor:pointer" onclick="openDayPopup(${i})">
         <div style="font-size:11px;color:var(--text3);font-weight:600">${DAYS[i]}</div>
         <div>
           <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;gap:1px">
@@ -3634,7 +3873,7 @@ function renderHourChart(all){
       const bp = 100-wp-lp;
       const totColor = d.pnl>=0?'var(--green)':'var(--red)';
       const avgColor = d.avgPnl>=0?'var(--green)':'var(--red)';
-      return `<div style="display:grid;grid-template-columns:36px 1fr 64px 64px;align-items:center;gap:6px">
+      return `<div style="display:grid;grid-template-columns:36px 1fr 64px 64px;align-items:center;gap:6px;cursor:pointer" onclick="openHourPopup(${h})">
         <div style="font-size:10px;color:var(--text3);font-weight:600">${h}:00</div>
         <div>
           <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;gap:1px">
