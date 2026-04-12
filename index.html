@@ -39,7 +39,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .sec{display:none}.sec.active{display:block}
 
 /* METRICS */
-.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px}
 .m{background:var(--bg2);border-radius:var(--r);padding:10px 12px;border:.5px solid var(--border)}
 .ml{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
 .mv{font-size:18px;font-weight:700}
@@ -56,12 +56,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .dash-grid-3>.card{margin-bottom:0}
 
 /* Mobile: stack everything */
-@media(max-width:700px){
-  .hdr{padding:12px 14px 0}
-  .content{padding:10px 14px;padding-bottom:calc(68px + var(--safe-b))}
+@media(max-width:1024px){
   .dash-grid{grid-template-columns:1fr}
   .dash-grid-3{grid-template-columns:1fr}
   .tw{grid-template-columns:1fr}
+}
+@media(max-width:900px){
+  .strat-grid-row, .strat-grid-hdr{
+    grid-template-columns:minmax(60px,1fr) 35px 55px 35px 45px 1fr 40px !important;
+    gap:3px 5px !important;
+    font-size:9px !important;
+  }
+  .dir-grid-row, .dir-grid-hdr{
+    grid-template-columns:50px 35px 45px 1fr 55px !important;
+    gap:3px 5px !important;
+  }
+}
+@media(max-width:700px){
+  .hdr{padding:12px 14px 0}
+  .content{padding:10px 14px;padding-bottom:calc(68px + var(--safe-b))}
   .mgrid{grid-template-columns:repeat(2,1fr)}
   .strat-grid-row, .strat-grid-hdr{
     grid-template-columns:minmax(60px,1fr) 35px 55px 35px 45px 1fr 40px !important;
@@ -72,6 +85,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
     grid-template-columns:50px 35px 45px 1fr 55px !important;
     gap:3px 5px !important;
   }
+  .tlog th:nth-child(2), .tlog td:nth-child(2){ display:none }
   /* Form: grotere touch targets op iPhone */
   .eo{padding:13px 11px !important;min-height:44px}
   .btn{min-height:50px !important;font-size:16px !important}
@@ -166,7 +180,7 @@ table.tlog tr.paper-row td{color:var(--paper)}
 .win-c{background:var(--green-bg);color:var(--green)}
 .loss-c{background:var(--red-bg);color:var(--red)}
 .be-c{background:var(--bg3);color:var(--text3)}
-.cw{position:relative;width:100%;height:190px}
+.cw{position:relative;width:100%;height:190px;min-height:150px}
 .tw{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 
 /* STRATEGY CHART */
@@ -355,17 +369,7 @@ input[type=range]{accent-color:var(--green);width:100%}
         </div>
         <div class="fg">
           <label>Strategie</label>
-          <select id="f-strat">
-            <option value="Break &amp; Retest">Break &amp; Retest</option>
-            <option value="Reversal">Reversal</option>
-            <option value="HOD Break">High of the Day Break</option>
-            <option value="LOD Break">Low of the Day Break</option>
-            <option value="Dipbuy">Dipbuy</option>
-            <option value="VWAP Bounce">VWAP Bounce</option>
-            <option value="ORB">Opening Range Breakout</option>
-            <option value="Long op Support">Long op Support</option>
-            <option value="Short in Resistance">Short in Resistance</option>
-          </select>
+          <select id="f-strat"></select>
         </div>
         <div class="fr">
           <div class="fg">
@@ -556,22 +560,35 @@ input[type=range]{accent-color:var(--green);width:100%}
           <div class="mgrid" id="streak-stats"></div>
         </div>
       </div>
+    </div>
 
-      <!-- BALANCE + RISK -->
-      <div class="dash-grid" style="margin-bottom:0">
-        <div class="card">
-          <div class="ct">Startbalans account</div>
-          <div class="fg" style="margin-top:4px">
-            <label>Bedrag in USD</label>
-            <input type="number" id="bal-input" placeholder="10000" step="100" oninput="onBalChange(this)" style="font-size:18px;font-weight:700">
-          </div>
+    <!-- ===== BEHEER ===== -->
+    <div id="sec-beheer" class="sec">
+
+      <!-- Startbalans -->
+      <div class="card">
+        <div class="ct">Startbalans account</div>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Wordt gebruikt voor de balansberekening in het dashboard.</p>
+        <div class="fg" style="margin-top:4px">
+          <label>Bedrag in USD</label>
+          <input type="number" id="bal-input" placeholder="10000" step="100" oninput="onBalChange(this)" style="font-size:18px;font-weight:700">
         </div>
-        <div class="card">
-          <div class="ct">Risk per trade (voor R:R berekening)</div>
-          <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Stel in hoeveel USD 1R waard is per periode. Trades worden automatisch berekend met de geldende risk op hun datum.</p>
-          <div id="risk-entries-list"></div>
-          <button onclick="addRiskEntry()" style="margin-top:8px;font-size:12px;padding:6px 12px;border-radius:var(--rsm);border:.5px solid var(--border2);background:transparent;color:var(--green);cursor:pointer">+ Periode toevoegen</button>
-        </div>
+      </div>
+
+      <!-- Risk per trade -->
+      <div class="card">
+        <div class="ct">Risk per trade (voor R:R berekening)</div>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Stel in hoeveel USD 1R waard is per periode. Trades worden automatisch berekend met de geldende risk op hun datum.</p>
+        <div id="risk-entries-list"></div>
+        <button onclick="addRiskEntry()" style="margin-top:8px;font-size:12px;padding:6px 12px;border-radius:var(--rsm);border:.5px solid var(--border2);background:transparent;color:var(--green);cursor:pointer">+ Periode toevoegen</button>
+      </div>
+
+      <!-- Strategieën -->
+      <div class="card">
+        <div class="ct">Strategieën beheren</div>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:14px">Voeg strategieën toe, wijzig namen of verwijder ze. Bestaande trades behouden hun strategie naam.</p>
+        <div id="strat-manage-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+        <button onclick="addStratEntry()" style="font-size:13px;padding:9px 16px;border:.5px solid var(--green);border-radius:var(--rsm);background:transparent;color:var(--green);cursor:pointer;width:100%">+ Strategie toevoegen</button>
       </div>
     </div>
 
@@ -588,6 +605,10 @@ input[type=range]{accent-color:var(--green);width:100%}
     <button class="nb" id="nav-dash" onclick="go('dash')">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
       Dashboard
+    </button>
+    <button class="nb" id="nav-beheer" onclick="go('beheer')">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Beheer
     </button>
   </nav>
 </div>
@@ -745,7 +766,16 @@ let popupChart = null;
 let cEquity=null, cRu=null, cWlb=null, cBt=null, cMissed=null;
 
 const BT_EXITS = ['1R Exit','2R Exit','3R Exit','4R Exit','5R Exit','2R/Trail SL 2m','Trail SL 2m','Trail SL 5m'];
-const STRATS = ['Break & Retest','Reversal','HOD Break','LOD Break','Dipbuy','VWAP Bounce','ORB','Long op Support','Short in Resistance'];
+const DEFAULT_STRATS = ['Break & Retest','Reversal','HOD Break','LOD Break','Dipbuy','VWAP Bounce','ORB','Long op Support','Short in Resistance'];
+let STRATS = (() => { try { const s=localStorage.getItem('tj4-strats'); return s?JSON.parse(s):DEFAULT_STRATS.slice(); } catch(e){ return DEFAULT_STRATS.slice(); } })();
+function saveStrats(){ try{ localStorage.setItem('tj4-strats',JSON.stringify(STRATS)); }catch(e){} }
+function rebuildStratDropdowns(){
+  const opts = STRATS.map(s=>`<option value="${s.replace(/"/g,'&quot;')}">${s}</option>`).join('');
+  const fStrat = document.getElementById('f-strat');
+  if(fStrat){ const cur=fStrat.value; fStrat.innerHTML=opts; if(STRATS.includes(cur)) fStrat.value=cur; }
+  buildLogFilters();
+  buildDashFilters();
+}
 const EMOS = ['Foutloos','Geldige entry niet genomen','Te vroege entry','Te late entry','Stoploss verruimd','SL te snel BE','TP te snel','TP te ver','Te grote sharesize'];
 const ECOL = {'Foutloos':'#10b981','Geldige entry niet genomen':'#3b82f6','Te vroege entry':'#f59e0b','Te late entry':'#f97316','Stoploss verruimd':'#f43f5e','SL te snel BE':'#ec4899','TP te snel':'#8b5cf6','TP te ver':'#6366f1','Te grote sharesize':'#f43f5e'};
 const ESHORT = {'Foutloos':'Foutloos','Geldige entry niet genomen':'Entry niet genomen','Te vroege entry':'Te vroeg (FOMO)','Te late entry':'Te laat','Stoploss verruimd':'SL verruimd','SL te snel BE':'SL→BE te snel','TP te snel':'TP te snel','TP te ver':'TP te ver','Te grote sharesize':'Te grote size'};
@@ -1286,13 +1316,84 @@ function onBalChange(inp){
 //  NAVIGATION
 // ============================================================
 function go(t){
-  ['log','add','dash'].forEach(s => {
+  ['log','add','dash','beheer'].forEach(s => {
     document.getElementById('sec-'+s).classList.toggle('active', s===t);
     document.getElementById('nav-'+s).classList.toggle('active', s===t);
   });
-  if(t==='log') renderLog();
-  if(t==='dash') renderDash();
+  if(t==='log')    renderLog();
+  if(t==='dash')   renderDash();
+  if(t==='beheer') renderStratManage();
   document.querySelector('.content').scrollTop = 0;
+}
+
+// ============================================================
+//  STRATEGY MANAGEMENT
+// ============================================================
+function renderStratManage(){
+  const el = document.getElementById('strat-manage-list');
+  if(!el) return;
+  renderRiskEntries();
+  el.innerHTML = STRATS.map((s,i)=>`
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="text" value="${s.replace(/"/g,'&quot;')}" data-idx="${i}"
+        onchange="renameStrat(${i},this.value)"
+        style="flex:1;font-size:13px;padding:8px 10px;background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--rsm);color:var(--text)">
+      <button onclick="moveStrat(${i},-1)" ${i===0?'disabled':''} title="Omhoog"
+        style="background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:var(--rsm);padding:6px 10px;cursor:pointer;font-size:14px">↑</button>
+      <button onclick="moveStrat(${i},1)" ${i===STRATS.length-1?'disabled':''} title="Omlaag"
+        style="background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:var(--rsm);padding:6px 10px;cursor:pointer;font-size:14px">↓</button>
+      <button onclick="deleteStrat(${i})" title="Verwijderen"
+        style="background:none;border:.5px solid var(--border2);color:var(--red);border-radius:var(--rsm);padding:6px 10px;cursor:pointer;font-size:14px">×</button>
+    </div>`).join('');
+}
+
+function renameStrat(i, newName){
+  newName = newName.trim();
+  if(!newName) return;
+  const oldName = STRATS[i];
+  if(newName === oldName) return;
+  // Update all trades with this strategy
+  trades.forEach(t=>{ if(t.strat===oldName){ t.strat=newName; dbSaveTrade(t).catch(()=>{}); } });
+  STRATS[i] = newName;
+  saveStrats();
+  rebuildStratDropdowns();
+  renderStratManage();
+  showSyncStatus('✓ Strategie hernoemd');
+  setTimeout(()=>showSyncStatus(''),2000);
+}
+
+function addStratEntry(){
+  STRATS.push('Nieuwe strategie');
+  saveStrats();
+  rebuildStratDropdowns();
+  renderStratManage();
+  // Focus the new input
+  setTimeout(()=>{
+    const inputs = document.querySelectorAll('#strat-manage-list input');
+    if(inputs.length) { inputs[inputs.length-1].select(); inputs[inputs.length-1].focus(); }
+  }, 50);
+}
+
+function moveStrat(i, dir){
+  const j = i + dir;
+  if(j<0 || j>=STRATS.length) return;
+  [STRATS[i], STRATS[j]] = [STRATS[j], STRATS[i]];
+  saveStrats();
+  rebuildStratDropdowns();
+  renderStratManage();
+}
+
+function deleteStrat(i){
+  const name = STRATS[i];
+  const used = trades.filter(t=>t.strat===name).length;
+  const msg = used > 0
+    ? `"${name}" wordt gebruikt in ${used} trade(s). Toch verwijderen? (Trades behouden de naam)`
+    : `"${name}" verwijderen?`;
+  if(!confirm(msg)) return;
+  STRATS.splice(i, 1);
+  saveStrats();
+  rebuildStratDropdowns();
+  renderStratManage();
 }
 
 // ============================================================
@@ -2846,6 +2947,11 @@ function calcRR(trades){
 // Lossrate = verliezende trades / totaal trades
 // Gem. win RU  = gemiddelde RU van winnende trades
 // Gem. loss RU = gemiddelde RU (abs) van verliezende trades
+// Expectancy in R = (Winrate × Gem.win RU) − (Lossrate × Gem.verlies RU)
+// NB: Dit is wiskundig identiek aan Gem. RU. De kolom toont de berekening
+// expliciet om de onderdelen zichtbaar te maken.
+// Expectancy wordt alleen getoond als er zowel wins als losses zijn,
+// zodat de afzonderlijke componenten (winrate × win, lossrate × loss) zichtbaar zijn.
 function calcExpectancy(trades){
   if(!trades.length) return {exp: null, expStr: '—'};
   const n      = trades.length;
@@ -2858,7 +2964,9 @@ function calcExpectancy(trades){
   const avgLossR = losses.length ? avg(losses.map(t=>Math.abs(+t.ru||0))) : 0;
   const exp = Math.round((winRate * avgWinR - lossRate * avgLossR) * 100) / 100;
   const expStr = (exp >= 0 ? '+' : '') + fmt(exp, 2) + 'R';
-  return {exp, expStr};
+  // Extra: toon de onderdelen voor tooltip
+  const detail = `${Math.round(winRate*100)}% × ${fmt(avgWinR,2)}R − ${Math.round(lossRate*100)}% × ${fmt(avgLossR,2)}R`;
+  return {exp, expStr, detail};
 }
 
 // Rolling expectancy: gem. R van de laatste N trades
@@ -3086,7 +3194,9 @@ function renderEquity(sorted){
 
 function renderStratChart(all){
   const el = document.getElementById('strat-chart');
-  const data = STRATS.map(s=>{
+  // Combineer STRATS + alle strategieën die in trades voorkomen
+  const allStrats = [...new Set([...STRATS, ...all.map(t=>t.strat).filter(Boolean)])];
+  const data = allStrats.map(s=>{
     const ts = all.filter(t=>t.strat===s);
     const w = ts.filter(t=>+t.pnl>0).length;
     const l = ts.filter(t=>+t.pnl<0).length;
@@ -3096,8 +3206,8 @@ function renderStratChart(all){
     const winPnl  = ts.filter(t=>+t.pnl>0).reduce((a,t)=>a+(+t.pnl||0),0);
     const lossPnl = ts.filter(t=>+t.pnl<0).reduce((a,t)=>a+Math.abs(+t.pnl||0),0);
     const pf = lossPnl>0 ? Math.round(winPnl/lossPnl*100)/100 : (winPnl>0?'∞':'-');
-    const {exp, expStr} = calcExpectancy(ts);
-    return {s, ts, w, l, be, totalRU, avgRU, n:ts.length, pf, exp, expStr};
+    const {exp, expStr, detail} = calcExpectancy(ts);
+    return {s, ts, w, l, be, totalRU, avgRU, n:ts.length, pf, exp, expStr, detail};
   }).filter(d=>d.n>0);
 
   if(!data.length){ el.innerHTML='<div class="empty" style="padding:1rem">Geen data.</div>'; return; }
@@ -3125,7 +3235,7 @@ function renderStratChart(all){
       <span style="font-size:11px;color:var(--text3);text-align:right">${d.n}</span>
       <span style="font-size:11px;font-weight:600;text-align:right;color:${d.avgRU>=0?'var(--green)':'var(--red)'}">${d.avgRU>=0?'+':''}${fmt(d.avgRU,2)}R</span>
       <span style="font-size:11px;font-weight:600;text-align:right;color:${pfColor}">${typeof d.pf==='number'?d.pf.toFixed(2):d.pf}</span>
-      <span style="font-size:11px;font-weight:700;text-align:right;color:${expColor}" title="Expectancy">${d.expStr}</span>
+      <span style="font-size:11px;font-weight:700;text-align:right;color:${expColor}" title="${d.detail||'Expectancy'}">${d.expStr}</span>
       <span style="font-size:11px;font-weight:700;text-align:right;color:${ruColor};white-space:nowrap">${d.totalRU>=0?'+':''}${fmt(d.totalRU,1)}R</span>
       <div style="display:flex;height:14px;border-radius:4px;overflow:hidden;gap:1px">
         <div style="width:${wp}%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${wp>=10?wp+'%':''}</div>
@@ -3465,9 +3575,9 @@ function renderEmoChart(all){
     });
     missedRU = Math.round(missedRU*100)/100;
 
-    const {exp, expStr} = calcExpectancy(ts);
+    const {exp, expStr, detail} = calcExpectancy(ts);
 
-    return {e, tot, wp, lp, missedRU, exp, expStr};
+    return {e, tot, wp, lp, missedRU, exp, expStr, detail};
   }).filter(Boolean);
 
   if(!rows.length){ el.innerHTML='<div class="empty" style="padding:1rem">Geen data.</div>'; return; }
@@ -3491,7 +3601,7 @@ function renderEmoChart(all){
       <div style="font-size:11px;text-align:right;color:var(--text3)">
         <span style="color:var(--green)">${wp}%</span> / <span style="color:var(--red)">${lp}%</span>
       </div>
-      <div style="font-size:11px;font-weight:700;text-align:right;color:${exp===null?'var(--text3)':exp>=0?'var(--green)':'var(--red)'}" title="Expectancy: verwachte R per trade">
+      <div style="font-size:11px;font-weight:700;text-align:right;color:${exp===null?'var(--text3)':exp>=0?'var(--green)':'var(--red)'}" title="${detail||'Expectancy: verwachte R per trade'}">
         ${expStr}
       </div>
       <div style="font-size:12px;font-weight:700;text-align:right;color:${missedRU>0?'var(--amber)':'var(--text3)'}">
@@ -3911,6 +4021,7 @@ function exportCSV(){
 // ============================================================
 buildLogFilters();
 buildDashFilters();
+rebuildStratDropdowns();
 renderLog(); // show empty state immediately
 loadFromSupabase(); // then load real data
 
