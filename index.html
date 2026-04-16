@@ -32,10 +32,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .hdr h1 span{color:var(--green)}
 .hdr-badge{font-size:10px;background:var(--bg3);color:var(--text2);padding:3px 8px;border-radius:20px;border:.5px solid var(--border2)}
 .content{flex:1;overflow-y:auto;padding:12px 24px;padding-bottom:calc(68px + var(--safe-b));-webkit-overflow-scrolling:touch}
-.bnav{position:fixed;bottom:0;left:0;width:100%;display:flex;background:var(--bg2);border-top:.5px solid var(--border2);padding-bottom:var(--safe-b);z-index:100}
-.nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;border:none;background:transparent;color:var(--text3);font-size:10px;cursor:pointer;transition:color .15s}
+.bnav{position:fixed;bottom:0;left:0;width:100%;display:flex;justify-content:center;background:var(--bg2);border-top:.5px solid var(--border2);padding-bottom:var(--safe-b);z-index:100}
+.nb{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 20px;border:none;background:transparent;color:var(--text3);font-size:10px;cursor:pointer;transition:color .15s;min-width:60px;max-width:100px;flex:1}
 .nb svg{width:21px;height:21px;stroke-width:1.8}
 .nb.active{color:var(--green)}
+.nb.drag-over{background:rgba(16,185,129,.1);border-radius:8px}
 .sec{display:none}.sec.active{display:block}
 
 /* METRICS */
@@ -88,7 +89,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   .tlog th:nth-child(2), .tlog td:nth-child(2){ display:none }
   /* Form: grotere touch targets op iPhone */
   .eo{padding:13px 11px !important;min-height:44px}
-  .btn{min-height:50px !important;font-size:16px !important}
+  .btn{min-height:48px !important;font-size:15px !important}
+  .btn-row{justify-content:stretch}
+  .btn-row .btn{flex:1}
   .star{font-size:40px !important;padding:6px !important}
   input,select,textarea{font-size:16px !important} /* voorkomt zoom op iOS */
 }
@@ -129,10 +132,13 @@ input:focus,select:focus{border-color:var(--blue)}
 .img-thumb{position:relative;width:80px;height:60px;border-radius:var(--rsm);overflow:hidden;border:.5px solid var(--border2)}
 .img-thumb img{width:100%;height:100%;object-fit:cover}
 .img-del{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:18px;height:18px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;line-height:1}
-.btn{width:100%;padding:14px;border-radius:var(--r);border:none;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-.btn-primary{background:var(--green);color:#fff}
-.btn-primary:active{opacity:.8}
-.btn-secondary{background:var(--bg3);color:var(--text2);margin-bottom:9px}
+.btn{padding:12px 24px;border-radius:var(--r);border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-width:120px}
+.btn-primary{background:var(--green);color:#fff;box-shadow:0 2px 12px rgba(16,185,129,.3)}
+.btn-primary:hover{background:#059669}
+.btn-primary:active{opacity:.85;transform:scale(.98)}
+.btn-secondary{background:var(--bg3);color:var(--text2);border:.5px solid var(--border2)}
+.btn-secondary:hover{background:var(--bg2);border-color:var(--text3)}
+.btn-row{display:flex;gap:10px;margin-top:8px;justify-content:flex-end}
 
 /* TRADE TABLE */
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -167,10 +173,12 @@ table.tlog tr.paper-row td{color:var(--paper)}
 /* DATE RANGE */
 .dr-bar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
 .drb{font-size:11px;padding:4px 10px;border-radius:20px;border:.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;white-space:nowrap}
-.drb.on{background:var(--blue-bg);color:var(--blue);border-color:var(--blue)}
-.dr-custom{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.dr-custom input{width:130px;font-size:12px;padding:5px 8px}
-.dr-custom button{font-size:11px;padding:5px 12px;border-radius:var(--rsm);border:.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer}
+.drb.on{background:rgba(16,185,129,.15);color:var(--green);border-color:var(--green)}
+.dr-custom{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;margin-bottom:4px}
+.dr-custom label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;display:block}
+.dr-custom .dr-field{display:flex;flex-direction:column}
+.dr-custom input[type="date"]{width:120px;font-size:11px;padding:4px 7px;background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--rsm);color:var(--text2);cursor:pointer}
+.dr-custom button{font-size:11px;padding:5px 12px;border-radius:var(--rsm);border:.5px solid var(--border2);background:var(--bg3);color:var(--text2);cursor:pointer;align-self:flex-end}
 
 /* DASHBOARD */
 .wlb{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
@@ -319,9 +327,9 @@ input[type=range]{accent-color:var(--green);width:100%}
             <span style="font-size:10px;color:var(--text3);min-width:58px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Periode</span>
             <div class="fscroll" id="log-filter-date" style="margin-bottom:0;padding-bottom:0"></div>
           </div>
-          <div id="log-date-custom" style="display:none;display:flex;gap:8px;margin-left:66px;flex-wrap:wrap">
-            <div class="fg" style="margin:0;flex:1;min-width:120px"><label style="font-size:10px">Van</label><input type="date" id="log-date-from" onchange="setLogDateCustom()"></div>
-            <div class="fg" style="margin:0;flex:1;min-width:120px"><label style="font-size:10px">Tot</label><input type="date" id="log-date-to" onchange="setLogDateCustom()"></div>
+          <div id="log-date-custom" style="display:none;gap:6px;margin-left:66px;flex-wrap:wrap" class="dr-custom">
+            <div class="dr-field"><label>Van</label><input type="date" id="log-date-from" onchange="setLogDateCustom()"></div>
+            <div class="dr-field"><label>Tot</label><input type="date" id="log-date-to" onchange="setLogDateCustom()"></div>
           </div>
         </div>
       </div>
@@ -358,12 +366,10 @@ input[type=range]{accent-color:var(--green);width:100%}
           <div class="fg"><label>Ticker</label><input type="text" id="f-ticker" placeholder="AAPL"></div>
           <div class="fg">
             <label>Type</label>
-            <div style="display:flex;gap:4px">
-              <div class="dt" style="flex:1">
-                <button class="db long" id="btn-long" onclick="setDir('Long')">↑ Long</button>
-                <button class="db" id="btn-short" onclick="setDir('Short')">↓ Short</button>
-              </div>
-              <button class="db" id="btn-paper" onclick="togglePaper()" style="border-radius:var(--rsm);border:.5px solid var(--border2);padding:0 10px;font-size:11px" title="Papertrade">Paper</button>
+            <div style="display:flex;gap:4px;align-items:stretch">
+              <button class="db long" id="btn-long" onclick="setDir('Long')" style="flex:1;min-width:0">↑ Long</button>
+              <button class="db" id="btn-short" onclick="setDir('Short')" style="flex:1;min-width:0">↓ Short</button>
+              <button class="db" id="btn-paper" onclick="togglePaper()" style="flex:0 0 auto;padding:0 12px;font-size:11px;border-radius:var(--rsm);border:.5px solid var(--border2);white-space:nowrap" title="Papertrade">📄 Paper</button>
             </div>
           </div>
         </div>
@@ -414,8 +420,10 @@ input[type=range]{accent-color:var(--green);width:100%}
           <div class="fg" style="margin-top:8px"><label>Of screenshot link</label><input type="url" id="f-link" placeholder="https://..."></div>
         </div>
         <div class="fg"><label>Opmerkingen</label><textarea id="f-notes" placeholder="Vrije beschrijving, analyse, lessen..." style="min-height:80px;resize:vertical;font-family:inherit;font-size:13px"></textarea></div>
-        <button class="btn btn-secondary" onclick="clearForm()">Wissen</button>
-        <button class="btn btn-primary" onclick="saveTrade()">Trade opslaan</button>
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="clearForm()">✕ Wissen</button>
+          <button class="btn btn-primary" onclick="saveTrade()">✓ Trade opslaan</button>
+        </div>
       </div>
     </div>
 
@@ -446,9 +454,9 @@ input[type=range]{accent-color:var(--green);width:100%}
         </div>
         <div class="dr-bar" id="dash-dr-bar" style="margin-top:10px;margin-bottom:0"></div>
         <div class="dr-custom" id="dash-custom" style="display:none">
-          <input type="date" id="dr-from"> <span style="color:var(--text3);font-size:12px">t/m</span>
-          <input type="date" id="dr-to">
-          <button onclick="applyCustomRange()">Toepassen</button>
+          <div class="dr-field"><label>Van</label><input type="date" id="dr-from"></div>
+          <div class="dr-field"><label>Tot</label><input type="date" id="dr-to"></div>
+          <button onclick="applyCustomRange()">↵</button>
         </div>
       </div>
 
@@ -475,9 +483,9 @@ input[type=range]{accent-color:var(--green);width:100%}
           </div>
           <div class="dr-bar" id="eq-dr-bar"></div>
           <div class="dr-custom" id="eq-custom" style="display:none">
-            <input type="date" id="eq-from"> <span style="color:var(--text3);font-size:12px">t/m</span>
-            <input type="date" id="eq-to">
-            <button onclick="applyEqRange()">Toepassen</button>
+            <div class="dr-field"><label>Van</label><input type="date" id="eq-from"></div>
+            <div class="dr-field"><label>Tot</label><input type="date" id="eq-to"></div>
+            <button onclick="applyEqRange()">↵</button>
           </div>
           <div class="cw"><canvas id="c-equity"></canvas></div>
         </div>
@@ -507,9 +515,9 @@ input[type=range]{accent-color:var(--green);width:100%}
           <div class="ct">RU per periode <button class="ct-expand" onclick="openChartModal('c-ru','RU per periode')">⛶</button></div>
           <div class="dr-bar" id="ru-dr-bar"></div>
           <div class="dr-custom" id="ru-custom" style="display:none">
-            <input type="date" id="ru-from"> <span style="color:var(--text3);font-size:12px">t/m</span>
-            <input type="date" id="ru-to">
-            <button onclick="applyRuRange()">Toepassen</button>
+            <div class="dr-field"><label>Van</label><input type="date" id="ru-from"></div>
+            <div class="dr-field"><label>Tot</label><input type="date" id="ru-to"></div>
+            <button onclick="applyRuRange()">↵</button>
           </div>
           <div class="cw"><canvas id="c-ru"></canvas></div>
         </div>
@@ -593,20 +601,20 @@ input[type=range]{accent-color:var(--green);width:100%}
     </div>
 
   </div>
-  <nav class="bnav">
-    <button class="nb active" id="nav-log" onclick="go('log')">
+  <nav class="bnav" id="main-nav">
+    <button class="nb active" id="nav-log" draggable="true" onclick="go('log')" data-tab="log">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       Log
     </button>
-    <button class="nb" id="nav-add" onclick="go('add')">
+    <button class="nb" id="nav-add" draggable="true" onclick="go('add')" data-tab="add">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
       Toevoegen
     </button>
-    <button class="nb" id="nav-dash" onclick="go('dash')">
+    <button class="nb" id="nav-dash" draggable="true" onclick="go('dash')" data-tab="dash">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
       Dashboard
     </button>
-    <button class="nb" id="nav-beheer" onclick="go('beheer')">
+    <button class="nb" id="nav-beheer" draggable="true" onclick="go('beheer')" data-tab="beheer">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       Beheer
     </button>
@@ -748,7 +756,7 @@ let logDateTo   = '';
 let dashFilterType  = 'all';  // all | Live | Paper
 let dashFilterDir   = 'all';  // all | Long | Short
 let dashFilterStrat = 'all';  // all | strategie
-let dashDateRange = '30d';
+let dashDateRange = 'all';
 let dashCustomFrom = '';
 let dashCustomTo = '';
 let eqDateRange = 'all';
@@ -1238,8 +1246,9 @@ function setDir(d){
 
 function togglePaper(){
   isPaper = !isPaper;
-  document.getElementById('btn-paper').className = 'db'+(isPaper?' paper-on':'');
-  document.getElementById('btn-paper').style.cssText = 'border-radius:var(--rsm);border:.5px solid var(--border2);padding:0 10px;font-size:11px';
+  const btn = document.getElementById('btn-paper');
+  btn.className = 'db'+(isPaper?' paper-on':'');
+  btn.style.cssText = 'flex:0 0 auto;padding:0 12px;font-size:11px;border-radius:var(--rsm);border:.5px solid var(--border2);white-space:nowrap';
 }
 
 // Format number with comma as decimal separator
@@ -1524,7 +1533,7 @@ function buildDashFilters(){
     .map(function(f){ return '<div class="fchip'+(f.k==='all'?' on':'')+' " onclick="setDFStrat(\''+f.k+'\',this)">'+f.l+'</div>'; }).join('');
 
   var ranges=[{k:'all',l:'Alles'},{k:'1d',l:'Dag'},{k:'7d',l:'Week'},{k:'30d',l:'Maand'},{k:'90d',l:'3 maanden'},{k:'180d',l:'6 maanden'},{k:'365d',l:'Jaar'},{k:'custom',l:'Eigen periode'}];
-  document.getElementById('dash-dr-bar').innerHTML=ranges.map(function(r){return '<div class="drb'+(r.k==='30d'?' on':'')+' " onclick="setDashRange(\''+r.k+'\',this)">'+r.l+'</div>';}).join('');
+  document.getElementById('dash-dr-bar').innerHTML=ranges.map(function(r){return '<div class="drb'+(r.k==='all'?' on':'')+' " onclick="setDashRange(\''+r.k+'\',this)">'+r.l+'</div>';}).join('');
 
   [{id:'eq-dr-bar',items:[{k:'all',l:'Alles'},{k:'7d',l:'Week'},{k:'30d',l:'Maand'},{k:'90d',l:'3m'},{k:'180d',l:'6m'},{k:'365d',l:'Jaar'},{k:'custom',l:'Eigen'}],fn:'setEqRange',def:'all'},{id:'ru-dr-bar',items:[{k:'day',l:'Dag'},{k:'week',l:'Week'},{k:'month',l:'Maand'},{k:'half',l:'Halfj.'},{k:'year',l:'Jaar'},{k:'all',l:'Alles'},{k:'custom',l:'Eigen'}],fn:'setRuRange',def:'day'}]
   .forEach(function(cfg){document.getElementById(cfg.id).innerHTML=cfg.items.map(function(r){return '<div class="drb'+(r.k===cfg.def?' on':'')+' " onclick="'+cfg.fn+'(\''+r.k+'\',this)">'+r.l+'</div>';}).join('');});
@@ -1545,8 +1554,8 @@ function resetDashFilters(){
   document.querySelectorAll('#dash-filter-dir .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
   document.querySelectorAll('#dash-filter-strat .fchip').forEach((c,i)=>c.classList.toggle('on',i===0));
   // Reset periodefilter naar 30d
-  dashDateRange='30d';
-  document.querySelectorAll('#dash-dr-bar .drb').forEach(c=>c.classList.toggle('on',c.textContent.trim()==='Maand'));
+  dashDateRange='all';
+  document.querySelectorAll('#dash-dr-bar .drb').forEach(c=>c.classList.toggle('on',c.textContent.trim()==='Alles'));
   document.getElementById('dash-custom').style.display='none';
   // Reset equity range
   eqDateRange='all'; eqShowTickers=false;
@@ -2586,7 +2595,7 @@ function clearForm(){
   // Paper standaard UIT
   isPaper=false;
   document.getElementById('btn-paper').className='db';
-  document.getElementById('btn-paper').style.cssText='border-radius:var(--rsm);border:.5px solid var(--border2);padding:0 10px;font-size:11px';
+  document.getElementById('btn-paper').style.cssText='flex:0 0 auto;padding:0 12px;font-size:11px;border-radius:var(--rsm);border:.5px solid var(--border2);white-space:nowrap';
   pendingImages=[];
   document.getElementById('img-previews').innerHTML='';
   const lbl=document.getElementById('star-label'); if(lbl) lbl.textContent='Geen beoordeling';
@@ -2681,7 +2690,7 @@ function openEdit(i){
             <button class="db${editDir==='Long'?' long':''}" id="e-btn-long" onclick="editSetDir('Long')">↑ Long</button>
             <button class="db${editDir==='Short'?' short':''}" id="e-btn-short" onclick="editSetDir('Short')">↓ Short</button>
           </div>
-          <button id="e-btn-paper" class="db${editPaper?' paper-on':''}" onclick="editTogglePaper()" style="border-radius:var(--rsm);border:.5px solid var(--border2);padding:0 10px;font-size:11px">Paper</button>
+          <button id="e-btn-paper" class="db${editPaper?' paper-on':''}" onclick="editTogglePaper()" style="flex:0 0 auto;padding:0 12px;font-size:11px;border-radius:var(--rsm);border:.5px solid var(--border2);white-space:nowrap">Paper</button>
         </div>
       </div>
     </div>
@@ -2713,7 +2722,7 @@ function openEdit(i){
 }
 
 function editSetDir(d){ editDir=d; document.getElementById('e-btn-long').className='db'+(d==='Long'?' long':''); document.getElementById('e-btn-short').className='db'+(d==='Short'?' short':''); }
-function editTogglePaper(){ editPaper=!editPaper; document.getElementById('e-btn-paper').className='db'+(editPaper?' paper-on':''); document.getElementById('e-btn-paper').style.cssText='border-radius:var(--rsm);border:.5px solid var(--border2);padding:0 10px;font-size:11px'; }
+function editTogglePaper(){ editPaper=!editPaper; document.getElementById('e-btn-paper').className='db'+(editPaper?' paper-on':''); document.getElementById('e-btn-paper').style.cssText='flex:0 0 auto;padding:0 12px;font-size:11px;border-radius:var(--rsm);border:.5px solid var(--border2);white-space:nowrap'; }
 function editSetStar(v){ editStarVal=v; document.querySelectorAll('#e-stars-row .star').forEach(s=>s.classList.toggle('on',+s.dataset.v<=v)); }
 
 function eImgDragOver(e){ e.preventDefault(); document.getElementById('e-img-drop').classList.add('drag'); }
@@ -4047,6 +4056,98 @@ buildDashFilters();
 rebuildStratDropdowns();
 renderLog(); // show empty state immediately
 loadFromSupabase(); // then load real data
+
+// ── Nav drag-to-reorder ──────────────────────────────────────
+(function initNavDrag(){
+  const nav = document.getElementById('main-nav');
+  if(!nav) return;
+
+  // Restore saved order
+  const saved = (() => { try{ return JSON.parse(localStorage.getItem('tj4-nav-order')||'null'); }catch(e){ return null; } })();
+  if(saved && saved.length === 4){
+    saved.forEach(tab => {
+      const btn = nav.querySelector(`[data-tab="${tab}"]`);
+      if(btn) nav.appendChild(btn);
+    });
+  }
+
+  let dragSrc = null;
+
+  nav.querySelectorAll('.nb').forEach(btn => {
+    btn.addEventListener('dragstart', e => {
+      dragSrc = btn;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(()=>btn.style.opacity='0.4', 0);
+    });
+    btn.addEventListener('dragend', () => {
+      btn.style.opacity = '';
+      nav.querySelectorAll('.nb').forEach(b=>b.classList.remove('drag-over'));
+      const order = [...nav.querySelectorAll('.nb')].map(b=>b.dataset.tab);
+      localStorage.setItem('tj4-nav-order', JSON.stringify(order));
+    });
+    btn.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if(btn !== dragSrc) btn.classList.add('drag-over');
+    });
+    btn.addEventListener('dragleave', () => btn.classList.remove('drag-over'));
+    btn.addEventListener('drop', e => {
+      e.preventDefault();
+      if(dragSrc && dragSrc !== btn){
+        const btns = [...nav.querySelectorAll('.nb')];
+        const srcI = btns.indexOf(dragSrc);
+        const tgtI = btns.indexOf(btn);
+        if(srcI < tgtI) btn.after(dragSrc);
+        else btn.before(dragSrc);
+      }
+      btn.classList.remove('drag-over');
+    });
+  });
+
+  // Touch reorder (long-press 500ms then drag)
+  let touchTimer, touchDragBtn, touchStartX, touchStartY;
+  nav.querySelectorAll('.nb').forEach(btn => {
+    btn.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchTimer = setTimeout(() => {
+        touchDragBtn = btn;
+        btn.style.opacity = '0.5';
+        btn.style.transform = 'scale(1.1)';
+      }, 500);
+    }, {passive:true});
+    btn.addEventListener('touchmove', e => {
+      if(!touchDragBtn) { clearTimeout(touchTimer); return; }
+      const x = e.touches[0].clientX;
+      const btns = [...nav.querySelectorAll('.nb')];
+      btns.forEach(b=>b.classList.remove('drag-over'));
+      const target = btns.find(b => {
+        const r = b.getBoundingClientRect();
+        return x >= r.left && x <= r.right && b !== touchDragBtn;
+      });
+      if(target) target.classList.add('drag-over');
+    }, {passive:true});
+    btn.addEventListener('touchend', e => {
+      clearTimeout(touchTimer);
+      if(!touchDragBtn) return;
+      const x = e.changedTouches[0].clientX;
+      const btns = [...nav.querySelectorAll('.nb')];
+      const target = btns.find(b => {
+        const r = b.getBoundingClientRect();
+        return x >= r.left && x <= r.right && b !== touchDragBtn;
+      });
+      if(target){
+        const srcI = btns.indexOf(touchDragBtn), tgtI = btns.indexOf(target);
+        if(srcI < tgtI) target.after(touchDragBtn); else target.before(touchDragBtn);
+        const order = [...nav.querySelectorAll('.nb')].map(b=>b.dataset.tab);
+        localStorage.setItem('tj4-nav-order', JSON.stringify(order));
+      }
+      touchDragBtn.style.opacity=''; touchDragBtn.style.transform='';
+      btns.forEach(b=>b.classList.remove('drag-over'));
+      touchDragBtn = null;
+    }, {passive:true});
+  });
+})();
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
