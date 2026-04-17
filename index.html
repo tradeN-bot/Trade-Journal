@@ -356,8 +356,37 @@ input[type=range]{accent-color:var(--green);width:100%}
 
     <!-- ===== ADD ===== -->
     <div id="sec-add" class="sec">
+      <!-- Broker import -->
+      <div class="card" style="margin-bottom:10px">
+        <div class="ct" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="toggleBrokerPanel()">
+          <span>📂 Broker import</span>
+          <span id="broker-chevron" style="font-size:12px;color:var(--text3);transition:transform .25s">▼</span>
+        </div>
+        <div id="broker-panel" style="display:none;margin-top:10px">
+          <div style="background:rgba(59,130,246,.08);border:.5px solid rgba(59,130,246,.25);border-radius:var(--rsm);padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--text3);line-height:1.7">
+            <b style="color:var(--blue)">Twee formaten worden herkend:</b><br>
+            <b>1. Volledig overzicht</b> — kolom 1: Ticker · 2: Buy/Sell · 3: Status (Filled) · 6: Prijs · 7: Aantal · 8: Datum+tijd<br>
+            <b>2. Filled orders</b> — kolom 1: Ticker · 2: Buy/Sell · 3: Aantal · 4: Prijs · 5: P&L · 7: Datum+tijd (geen Status kolom)<br>
+            Meerdere trades en tickers tegelijk uploaden is mogelijk.
+            <span style="color:var(--green);cursor:pointer;margin-left:8px" onclick="showBrokerHistory()">▶ Eerder geïmporteerd →</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+            <label style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--rsm);cursor:pointer;font-size:12px;color:var(--text2)">
+              📄 Bestand kiezen
+              <input type="file" id="broker-file-input" accept=".txt,.csv,.tsv" style="display:none" onchange="parseBrokerFile(this)">
+            </label>
+            <span id="broker-file-name" style="font-size:11px;color:var(--text3)">of plak hieronder</span>
+          </div>
+          <textarea id="broker-paste" placeholder="Plak hier je orderdata (volledig overzicht of alleen filled orders)..." style="width:100%;min-height:80px;resize:vertical;font-family:monospace;font-size:11px;background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--rsm);padding:8px;color:var(--text2);box-sizing:border-box" oninput="debounceBrokerParse(this.value)"></textarea>
+          <div id="broker-parse-result" style="margin-top:10px"></div>
+        </div>
+      </div>
+
       <div class="card">
-        <div class="ct">Nieuwe trade invoeren</div>
+        <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Nieuwe trade invoeren</span>
+          <button onclick="go('log')" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1;padding:0 2px" title="Sluiten">×</button>
+        </div>
         <div class="fr">
           <div class="fg"><label>Datum</label><input type="date" id="f-date"></div>
           <div class="fg"><label>Tijdstip</label><input type="time" id="f-time"></div>
@@ -418,6 +447,11 @@ input[type=range]{accent-color:var(--green);width:100%}
           </div>
           <div class="img-previews" id="img-previews"></div>
           <div class="fg" style="margin-top:8px"><label>Of screenshot link</label><input type="url" id="f-link" placeholder="https://..."></div>
+        </div>
+        <!-- Actieplan controle (regels 1-3 handmatig) -->
+        <div class="fg">
+          <label>✔ Actieplan controle — klik ✓ gevolgd of ✗ gebroken</label>
+          <div style="display:flex;flex-direction:column;gap:2px;border-radius:var(--rsm);border:.5px solid var(--border2);overflow:hidden" id="actieplan-wrapper"></div>
         </div>
         <div class="fg"><label>Opmerkingen</label><textarea id="f-notes" placeholder="Vrije beschrijving, analyse, lessen..." style="min-height:80px;resize:vertical;font-family:inherit;font-size:13px"></textarea></div>
         <div class="btn-row">
@@ -567,6 +601,13 @@ input[type=range]{accent-color:var(--green);width:100%}
           <div class="ct">Statistieken</div>
           <div class="mgrid" id="streak-stats"></div>
         </div>
+      </div>
+
+      <!-- Actieplan naleving -->
+      <div class="card">
+        <div class="ct">Actieplan naleving</div>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Regels 1-3: op basis van jouw invoer per trade. Regel 4: automatisch berekend uit dagelijks RU-totaal. Klik op een regel voor details.</p>
+        <div id="actieplan-stats"></div>
       </div>
     </div>
 
@@ -784,9 +825,9 @@ function rebuildStratDropdowns(){
   buildLogFilters();
   buildDashFilters();
 }
-const EMOS = ['Foutloos','Geldige entry niet genomen','Te vroege entry','Te late entry','Stoploss verruimd','SL te snel BE','TP te snel','TP te ver','Te grote sharesize'];
-const ECOL = {'Foutloos':'#10b981','Geldige entry niet genomen':'#3b82f6','Te vroege entry':'#f59e0b','Te late entry':'#f97316','Stoploss verruimd':'#f43f5e','SL te snel BE':'#ec4899','TP te snel':'#8b5cf6','TP te ver':'#6366f1','Te grote sharesize':'#f43f5e'};
-const ESHORT = {'Foutloos':'Foutloos','Geldige entry niet genomen':'Entry niet genomen','Te vroege entry':'Te vroeg (FOMO)','Te late entry':'Te laat','Stoploss verruimd':'SL verruimd','SL te snel BE':'SL→BE te snel','TP te snel':'TP te snel','TP te ver':'TP te ver','Te grote sharesize':'Te grote size'};
+const EMOS = ['Foutloos','Geldige entry niet genomen','Te vroege entry','Te late entry','Stoploss verruimd','SL gecancelled','SL te snel BE','TP te snel','TP te ver','Te grote sharesize','Averaging down','Overmodificatie','Plan losgelaten'];
+const ECOL = {'Foutloos':'#10b981','Geldige entry niet genomen':'#3b82f6','Te vroege entry':'#f59e0b','Te late entry':'#f97316','Stoploss verruimd':'#f43f5e','SL gecancelled':'#dc2626','SL te snel BE':'#ec4899','TP te snel':'#8b5cf6','TP te ver':'#6366f1','Te grote sharesize':'#f43f5e','Averaging down':'#b91c1c','Overmodificatie':'#d97706','Plan losgelaten':'#9f1239'};
+const ESHORT = {'Foutloos':'Foutloos','Geldige entry niet genomen':'Entry niet genomen','Te vroege entry':'Te vroeg (FOMO)','Te late entry':'Te laat','Stoploss verruimd':'SL verruimd','SL gecancelled':'SL gecancelled','SL te snel BE':'SL→BE te snel','TP te snel':'TP te snel','TP te ver':'TP te ver','Te grote sharesize':'Te grote size','Averaging down':'Averaging down','Overmodificatie':'Overmodificatie','Plan losgelaten':'Plan losgelaten'};
 const DAYS = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
 
 // ============================================================
@@ -2011,13 +2052,24 @@ function openTradeDetail(idx, scrollToImg){
     emosWrap.style.marginBottom = '0';
   }
 
-  // Notes
+  // Actieplan in detail
   const notesWrap = document.getElementById('td-notes-wrap');
+  const ruleShort = ['R1: Positiegrootte','R2: Stop staan laten','R3: Geen averaging down'];
+  let rulesHtml = '';
+  if(t.rules && t.rules.some(v=>v!==0)){
+    rulesHtml = '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Actieplan</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">'
+      + ruleShort.map((lbl,i)=>{
+          const v=(t.rules||[])[i];
+          if(!v) return '';
+          const col=v===1?'var(--green)':'var(--red)';
+          return `<div style="display:flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;border:1px solid ${col};font-size:11px;color:${col}">${v===1?'✓':'✗'} ${lbl}</div>`;
+        }).join('') + '</div>';
+  }
+  // Notes
   if(t.notes && t.notes.trim()){
-    notesWrap.innerHTML = `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Opmerkingen</div>
-      <div style="font-size:13px;color:var(--text2);background:var(--bg3);border-radius:var(--rsm);padding:10px 12px;line-height:1.5;white-space:pre-wrap;margin-bottom:14px">${t.notes}</div>`;
+    notesWrap.innerHTML = rulesHtml + `<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Opmerkingen</div><div style="font-size:13px;color:var(--text2);background:var(--bg3);border-radius:var(--rsm);padding:10px 12px;line-height:1.5;white-space:pre-wrap;margin-bottom:14px">${t.notes}</div>`;
   } else {
-    notesWrap.innerHTML = '';
+    notesWrap.innerHTML = rulesHtml;
   }
 
   // Images
@@ -2588,8 +2640,387 @@ document.addEventListener('touchend', e=>{
 // ============================================================
 //  SAVE / EDIT / DELETE
 // ============================================================
+// ============================================================
+//  ACTIEPLAN — regels 1-3 handmatig, regel 4 automatisch
+// ============================================================
+const RULES = [
+  {id:'rule1', label:'Regel 1', desc:'Positiegrootte berekend v\u00f3\u00f3r entry'},
+  {id:'rule2', label:'Regel 2', desc:'Stop niet aangepast na entry'},
+  {id:'rule3', label:'Regel 3', desc:'Niet bijgekocht in verlies'},
+];
+const ruleState     = {rule1:0, rule2:0, rule3:0}; // 0=leeg, 1=goed, -1=fout
+const editRuleState = {rule1:0, rule2:0, rule3:0};
+
+function _renderRulesInto(wrapperId, stateObj, toggleFn){
+  const w = document.getElementById(wrapperId);
+  if(!w) return;
+  w.innerHTML = RULES.map(r=>{
+    const s = stateObj[r.id];
+    const good = s===1, bad = s===-1;
+    const bg = good?'rgba(16,185,129,.08)':bad?'rgba(244,63,94,.08)':'var(--bg3)';
+    const gc = good?'var(--green)':'var(--border2)';
+    const bc = bad ?'var(--red)' :'var(--border2)';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${bg}">
+      <button onclick="${toggleFn}('${r.id}',1)" style="width:26px;height:26px;border-radius:50%;border:1.5px solid ${gc};background:${good?'rgba(16,185,129,.25)':'transparent'};color:${good?'var(--green)':'var(--text3)'};cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">✓</button>
+      <button onclick="${toggleFn}('${r.id}',-1)" style="width:26px;height:26px;border-radius:50%;border:1.5px solid ${bc};background:${bad?'rgba(244,63,94,.25)':'transparent'};color:${bad?'var(--red)':'var(--text3)'};cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">✗</button>
+      <span style="font-size:12px;color:${good?'var(--green)':bad?'var(--red)':'var(--text2)'}"><b>${r.label}</b> — ${r.desc}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderActieplan(){ _renderRulesInto('actieplan-wrapper', ruleState, 'toggleRule'); }
+function renderEditActieplan(){ _renderRulesInto('e-actieplan-wrapper', editRuleState, 'toggleEditRule'); }
+
+function toggleRule(id,val){ ruleState[id]=ruleState[id]===val?0:val; renderActieplan(); }
+function toggleEditRule(id,val){ editRuleState[id]=editRuleState[id]===val?0:val; renderEditActieplan(); }
+
+function resetRules(){ RULES.forEach(r=>ruleState[r.id]=0); renderActieplan(); }
+function getRulesArray(){ return RULES.map(r=>ruleState[r.id]); }
+function setRulesFromArray(arr){ RULES.forEach((r,i)=>{ ruleState[r.id]=(arr&&arr[i])||0; }); renderActieplan(); }
+function getEditRulesArray(){ return RULES.map(r=>editRuleState[r.id]); }
+function setEditRulesFromArray(arr){ RULES.forEach((r,i)=>{ editRuleState[r.id]=(arr&&arr[i])||0; }); renderEditActieplan(); }
+
+// ── Dashboard: actieplan statistieken ───────────────────────────────────────
+let _actieplanAll = [];
+
+function renderActieplanStats(all){
+  _actieplanAll = all;
+  const el = document.getElementById('actieplan-stats');
+  if(!el) return;
+
+  const ruleLabels = RULES.map(r=>`${r.label} — ${r.desc}`);
+
+  // Regels 1-3: handmatig
+  let html = ruleLabels.map((label,i)=>{
+    const filled = all.filter(t=>t.rules&&t.rules[i]!==0&&t.rules[i]!==undefined);
+    if(!filled.length) return `<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:3px">${label}</div>
+      <div style="font-size:11px;color:var(--text3)">Nog geen data ingevuld</div></div>`;
+    const good=filled.filter(t=>t.rules[i]===1).length;
+    const bad =filled.filter(t=>t.rules[i]===-1).length;
+    const tot =good+bad;
+    const pG=tot?Math.round(good/tot*100):0, pB=100-pG;
+    const avgG=good?filled.filter(t=>t.rules[i]===1).reduce((s,t)=>s+(+t.pnl||0),0)/good:null;
+    const avgB=bad ?filled.filter(t=>t.rules[i]===-1).reduce((s,t)=>s+(+t.pnl||0),0)/bad :null;
+    return `<div style="margin-bottom:14px;cursor:pointer" onclick="openActieplanPopup(${i})" title="Klik voor details">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:12px;font-weight:600;color:var(--text2)">${label} ↗</span>
+        <span style="font-size:10px;color:var(--text3)">${tot} trades</span>
+      </div>
+      <div style="display:flex;height:16px;border-radius:4px;overflow:hidden;gap:1px;margin-bottom:4px">
+        ${good>0?`<div style="width:${pG}%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${pG>=15?'✓ '+pG+'%':''}</div>`:''}
+        ${bad>0?`<div style="width:${pB}%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${pB>=15?'✗ '+pB+'%':''}</div>`:''}
+      </div>
+      <div style="display:flex;gap:14px;font-size:11px">
+        <span style="color:var(--green)">✓ ${good}× gevolgd${avgG!==null?' · gem. P&L: '+fmtU(avgG):''}</span>
+        <span style="color:var(--red)">✗ ${bad}× niet${avgB!==null?' · gem. P&L: '+fmtU(avgB):''}</span>
+      </div></div>`;
+  }).join('<div style="height:.5px;background:var(--border);margin:4px 0 12px"></div>');
+
+  // Regel 4: automatisch uit dagelijks RU
+  const dayRU={}, dayPnl={};
+  all.forEach(t=>{ dayRU[t.date]=(dayRU[t.date]||0)+(+t.ru||0); dayPnl[t.date]=(dayPnl[t.date]||0)+(+t.pnl||0); });
+  const dayEntries=Object.entries(dayRU).sort((a,b)=>a[0].localeCompare(b[0]));
+  const breached=dayEntries.filter(([,ru])=>ru<-3);
+  const ok=dayEntries.filter(([,ru])=>ru>=-3);
+  const tot=dayEntries.length;
+  const pOk=tot?Math.round(ok.length/tot*100):0;
+
+  html += `<div style="height:.5px;background:var(--border);margin:4px 0 12px"></div>
+    <div style="margin-bottom:6px;cursor:pointer" onclick="openRule4Popup()" title="Klik voor details">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:12px;font-weight:600;color:var(--text2)">Regel 4 — Daglimiet -3R ↗ <span style="font-size:10px;color:var(--amber);font-weight:400">(automatisch)</span></span>
+        <span style="font-size:10px;color:var(--text3)">${tot} handelsdagen</span>
+      </div>
+      <div style="display:flex;height:16px;border-radius:4px;overflow:hidden;gap:1px;margin-bottom:4px">
+        ${ok.length>0?`<div style="width:${pOk}%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${pOk>=15?'✓ '+pOk+'%':''}</div>`:''}
+        ${breached.length>0?`<div style="width:${100-pOk}%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700">${(100-pOk)>=15?'✗ '+(100-pOk)+'%':''}</div>`:''}
+      </div>
+      <div style="display:flex;gap:14px;font-size:11px">
+        <span style="color:var(--green)">✓ ${ok.length} dagen binnen -3R</span>
+        <span style="color:var(--red)">✗ ${breached.length} dag${breached.length!==1?'en':''} overschreden</span>
+      </div>
+    </div>`;
+
+  el.innerHTML = html;
+}
+
+function openActieplanPopup(ruleIdx){
+  const all=_actieplanAll;
+  const label=RULES[ruleIdx].label+' — '+RULES[ruleIdx].desc;
+  const good=all.filter(t=>t.rules&&t.rules[ruleIdx]===1);
+  const bad =all.filter(t=>t.rules&&t.rules[ruleIdx]===-1);
+  const pnlG=good.reduce((s,t)=>s+(+t.pnl||0),0), ruG=good.reduce((s,t)=>s+(+t.ru||0),0);
+  const pnlB=bad.reduce((s,t)=>s+(+t.pnl||0),0),  ruB=bad.reduce((s,t)=>s+(+t.ru||0),0);
+
+  const mkList=(ts,col,icon)=>ts.sort((a,b)=>b.date.localeCompare(a.date)).map(t=>{
+    const idx=trades.indexOf(t);
+    return `<div onclick="openTradeDetail(${idx});closeChartPopup()" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid var(--border);cursor:pointer">
+      <div><span style="color:${col};font-weight:700;margin-right:4px">${icon}</span>
+        <span style="font-size:12px;font-weight:600;color:var(--text2)">${t.ticker}</span>
+        <span style="font-size:10px;color:var(--text3);margin-left:6px">${fmtDate(t.date,true)} ${t.strat||''}</span>
+      </div>
+      <div style="display:flex;gap:10px;font-size:11px">
+        <span style="color:${+t.pnl>=0?'var(--green)':'var(--red)'}">${fmtU(+t.pnl||0)}</span>
+        <span style="color:${+t.ru>=0?'var(--green)':'var(--red)'}">${+t.ru>=0?'+':''}${fmt(+t.ru||0,2)}R</span>
+      </div></div>`;
+  }).join('');
+
+  document.getElementById('chart-popup-filters').style.display='none';
+  document.getElementById('chart-popup-title').innerHTML=`${label} <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+  document.querySelector('#chart-popup .cw').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div class="m"><div class="ml">✓ Gevolgd</div><div class="mv pos">${good.length}×</div><div class="ms">${good.length?'gem. '+fmtU(pnlG/good.length):''}</div></div>
+      <div class="m"><div class="ml">✗ Niet gevolgd</div><div class="mv neg">${bad.length}×</div><div class="ms">${bad.length?'gem. '+fmtU(pnlB/bad.length):''}</div></div>
+      <div class="m"><div class="ml">Totaal P&L ✓</div><div class="mv ${pnlG>=0?'pos':'neg'}">${fmtU(pnlG)}</div><div class="ms">${fmt(ruG,2)}R</div></div>
+      <div class="m"><div class="ml">Totaal P&L ✗</div><div class="mv ${pnlB>=0?'pos':'neg'}">${fmtU(pnlB)}</div><div class="ms">${fmt(ruB,2)}R</div></div>
+    </div>
+    ${good.length?`<div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">✓ Gevolgd (${good.length})</div>${mkList(good,'var(--green)','✓')}`:''}
+    ${bad.length?`<div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px">✗ Niet gevolgd (${bad.length})</div>${mkList(bad,'var(--red)','✗')}`:''}
+  `;
+  document.getElementById('chart-popup').style.display='flex';
+}
+
+function openRule4Popup(){
+  const all=_actieplanAll;
+  const dayRU={},dayPnl={};
+  all.forEach(t=>{ dayRU[t.date]=(dayRU[t.date]||0)+(+t.ru||0); dayPnl[t.date]=(dayPnl[t.date]||0)+(+t.pnl||0); });
+  const entries=Object.entries(dayRU).sort((a,b)=>b[0].localeCompare(a[0]));
+  const breached=entries.filter(([,ru])=>ru<-3);
+  const ok=entries.filter(([,ru])=>ru>=-3);
+
+  document.getElementById('chart-popup-filters').style.display='none';
+  document.getElementById('chart-popup-title').innerHTML=`Regel 4 — Daglimiet -3R <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+  document.querySelector('#chart-popup .cw').innerHTML=`
+    <div style="background:rgba(59,130,246,.08);border:.5px solid rgba(59,130,246,.25);border-radius:var(--rsm);padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.6">
+      Daglimiet = <b>-3R per dag</b>. Bereikt? Platform dicht.<br>
+      ${breached.length?`Jouw slechtste dag: <b>${fmtDate(breached.sort((a,b)=>a[1]-b[1])[0][0],true)}</b> (${fmt(Math.min(...breached.map(([,r])=>r)),2)}R).`:'Nog geen overschrijdingen — goed bezig!'}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div class="m"><div class="ml">✓ Binnen limiet</div><div class="mv pos">${ok.length} dagen</div></div>
+      <div class="m"><div class="ml">✗ Overschreden</div><div class="mv neg">${breached.length} dagen</div></div>
+    </div>
+    ${breached.length?`<div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Overschrijdingen</div>
+    ${breached.sort((a,b)=>a[1]-b[1]).map(([date,ru])=>{
+      const dayTs=all.filter(t=>t.date===date);
+      return `<div style="padding:8px 0;border-bottom:.5px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <b style="color:var(--text2)">${fmtDate(date,true)}</b>
+          <span style="color:var(--red);font-weight:700">${fmt(ru,2)}R &nbsp;·&nbsp; ${fmtU(dayPnl[date]||0)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3)">${dayTs.map(t=>{
+          const idx=trades.indexOf(t);
+          return `<span onclick="openTradeDetail(${idx});closeChartPopup()" style="cursor:pointer;margin-right:8px;color:${+t.pnl>=0?'var(--green)':'var(--red)'}">${t.ticker} ${fmt(+t.ru||0,2)}R</span>`;
+        }).join('')}</div>
+      </div>`;
+    }).join('')}`:`<div style="color:var(--green);font-size:12px;padding:8px 0">✓ Geen overschrijdingen!</div>`}
+  `;
+  document.getElementById('chart-popup').style.display='flex';
+}
+
+// ============================================================
+//  BROKER IMPORT — ondersteunt twee formaten
+// ============================================================
+function toggleBrokerPanel(){
+  const p=document.getElementById('broker-panel'), c=document.getElementById('broker-chevron');
+  const open=p.style.display==='none';
+  p.style.display=open?'block':'none';
+  c.style.transform=open?'rotate(180deg)':'';
+}
+
+function parseBrokerFile(input){
+  const file=input.files[0]; if(!file) return;
+  document.getElementById('broker-file-name').textContent=file.name;
+  const r=new FileReader();
+  r.onload=e=>{ try{ showBrokerResult(parseBrokerData(e.target.result)); } catch(err){ showBrokerError(err.message); } input.value=''; };
+  r.readAsText(file);
+}
+
+function debounceBrokerParse(text){
+  clearTimeout(debounceBrokerParse._t);
+  debounceBrokerParse._t=setTimeout(()=>{
+    if(!text.trim()) return;
+    try{ showBrokerResult(parseBrokerData(text)); } catch(err){ showBrokerError(err.message); }
+  }, 500);
+}
+
+function showBrokerError(msg){
+  document.getElementById('broker-parse-result').innerHTML=`<div style="color:var(--red);font-size:12px">⚠ ${msg}</div>`;
+}
+
+function parseNum(s){
+  if(!s) return 0;
+  s=String(s).replace(/USD|EUR|\$/g,'').trim();
+  const lc=s.lastIndexOf(','), ld=s.lastIndexOf('.');
+  if(lc>ld) s=s.replace(/\./g,'').replace(',','.');
+  else s=s.replace(/,/g,'');
+  return parseFloat(s)||0;
+}
+
+function parseBrokerData(text){
+  const lines=text.trim().split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) throw new Error('Geen data gevonden.');
+
+  // Detect format by checking if column 3 looks like a status word or a number
+  // Format 1 (volledig): col2=status(Filled/Cancelled), col5=prijs, col6=qty, col7=datetime
+  // Format 2 (filled):   col1=action, col2=qty(number), col3=prijs, col4=P&L, col6=datetime
+  const firstData = lines[0].split('\t');
+  const col2 = (firstData[2]||'').trim();
+  const isFilledFormat = !isNaN(parseNum(col2)) && parseNum(col2) > 0 && parseNum(col2) < 100000;
+
+  let rows = [];
+
+  if(isFilledFormat){
+    // Format 2: Ticker | Buy/Sell | Qty | Price | Commission | P&L_partial | Datetime | Exchange | ...
+    rows = lines.map(line=>{
+      const c=line.split('\t');
+      const ticker=(c[0]||'').trim().toUpperCase();
+      const action=(c[1]||'').trim();
+      const qty   =parseInt(parseNum(c[2]));
+      const price =parseNum(c[3]);
+      const pnl   =parseNum(c[5]); // partial P&L per row
+      const dt    =(c[6]||'').trim();
+      return {ticker,action,qty,price,pnl,datetime:dt,format:2};
+    }).filter(r=>r.ticker&&(/buy|sell/i.test(r.action))&&r.qty>0&&r.price>0);
+  } else {
+    // Format 1: Ticker | Action | Status | OrderID | Type | Price | Qty | Datetime | ...
+    // Detect header
+    const firstLower=lines[0].toLowerCase();
+    const hasHeader=/ticker|symbol|action/.test(firstLower);
+    const data=hasHeader?lines.slice(1):lines;
+    rows = data.map(line=>{
+      const c=line.split('\t');
+      const ticker=(c[0]||'').trim().toUpperCase();
+      const action=(c[1]||'').trim();
+      const status=(c[2]||'').trim();
+      const price =parseNum(c[5]);
+      const qty   =parseInt((c[6]||'0').replace(/[, ]/g,''))||0;
+      const dt    =(c[7]||'').trim();
+      return {ticker,action,status,qty,price,datetime:dt,format:1};
+    }).filter(r=>r.ticker&&/fill/i.test(r.status)&&r.price>0&&r.qty>0);
+  }
+
+  if(!rows.length){
+    throw new Error(isFilledFormat
+      ? 'Geen geldige rijen gevonden. Verwacht: Ticker | Buy/Sell | Aantal | Prijs | ... | P&L | Datum'
+      : 'Geen Filled orders gevonden. Controleer kolom 3 (Status=Filled), kolom 6 (Prijs) en kolom 7 (Aantal).');
+  }
+
+  // Group by ticker + date
+  const groups={};
+  rows.forEach(r=>{
+    const dtParts=r.datetime.split(' ');
+    const dp=dtParts[0].split('-');
+    const isoDate=dp[0].length===4?dtParts[0]:`${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
+    const timePart=dtParts.slice(1).join(' ').slice(0,5)||'';
+    const key=r.ticker+'|'+isoDate;
+    if(!groups[key]) groups[key]={ticker:r.ticker,isoDate,buys:[],sells:[],format:r.format};
+    const entry={...r,isoDate,timePart};
+    if(/buy/i.test(r.action)) groups[key].buys.push(entry);
+    else groups[key].sells.push(entry);
+  });
+
+  const result=[];
+  Object.values(groups).forEach(g=>{
+    if(!g.buys.length||!g.sells.length) return;
+    const entryRows=g.buys.sort((a,b)=>a.datetime.localeCompare(b.datetime));
+    const exitRows =g.sells.sort((a,b)=>a.datetime.localeCompare(b.datetime));
+    const entryQty =entryRows.reduce((s,r)=>s+r.qty,0);
+    const exitQty  =exitRows.reduce((s,r)=>s+r.qty,0);
+    const avgEntry =entryRows.reduce((s,r)=>s+r.price*r.qty,0)/entryQty;
+    const avgExit  =exitRows.reduce((s,r)=>s+r.price*r.qty,0)/exitQty;
+    const matchQty =Math.min(entryQty,exitQty);
+    // Use sum of partial P&Ls if format 2, else calculate
+    const pnl = g.format===2
+      ? Math.round(exitRows.reduce((s,r)=>s+r.pnl,0)*100)/100
+      : Math.round((avgExit-avgEntry)*matchQty*100)/100;
+
+    result.push({
+      ticker:g.ticker, date:g.isoDate,
+      time:entryRows[0].timePart,
+      dir:'Long', qty:matchQty,
+      avgEntry:Math.round(avgEntry*10000)/10000,
+      avgExit :Math.round(avgExit*10000)/10000,
+      pnl, partials:exitRows.length
+    });
+  });
+
+  if(!result.length) throw new Error('Trades konden niet worden samengesteld. Zijn er zowel Buy als Sell orders?');
+  return result.sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function showBrokerResult(parsed){
+  const el=document.getElementById('broker-parse-result');
+  window._brokerParsed=parsed;
+  el.innerHTML=`
+    <div style="font-size:12px;color:var(--green);margin-bottom:8px">✓ ${parsed.length} trade(s) herkend</div>
+    ${parsed.map((t,i)=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg3);border-radius:var(--rsm);margin-bottom:6px;border:.5px solid var(--border2)">
+        <div>
+          <span style="font-weight:600;color:var(--text)">${t.ticker}</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:6px">${t.dir} · ${t.qty}× · ${fmtDate(t.date,true)} ${t.time}</span>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">entry $${fmt(t.avgEntry,2)} → exit $${fmt(t.avgExit,2)} · ${t.partials} deelsluitingen</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:700;color:${t.pnl>=0?'var(--green)':'var(--red)'}">${t.pnl>=0?'+':''}$${fmt(Math.abs(t.pnl),2)}</span>
+          <button onclick="importBrokerTrade(${i})" style="font-size:11px;padding:5px 12px;background:var(--green);color:#fff;border:none;border-radius:var(--rsm);cursor:pointer">Importeren →</button>
+        </div>
+      </div>`).join('')}`;
+}
+
+function importBrokerTrade(i){
+  const t=(window._brokerParsed||[])[i]; if(!t) return;
+  try{
+    const hist=JSON.parse(localStorage.getItem('tj4-broker-history')||'[]');
+    if(!hist.find(h=>h.ticker===t.ticker&&h.date===t.date&&h.time===t.time)) hist.push(t);
+    localStorage.setItem('tj4-broker-history',JSON.stringify(hist.slice(-100)));
+  }catch(e){}
+  go('add');
+  setTimeout(()=>{
+    document.getElementById('f-date').value=t.date;
+    document.getElementById('f-time').value=t.time;
+    document.getElementById('f-ticker').value=t.ticker;
+    document.getElementById('f-pnl').value=String(t.pnl).replace('.',',');
+    const risk=getRiskForDate(t.date);
+    if(risk>0) document.getElementById('f-ru').value=String(Math.round(t.pnl/risk*100)/100).replace('.',',');
+    setDir(t.dir);
+    document.getElementById('f-notes').value=`Import: ${t.qty}× ${t.ticker} ${t.dir}\nEntry: $${fmt(t.avgEntry,4)} → Exit: $${fmt(t.avgExit,4)} (${t.partials} deelsluitingen)`;
+    document.querySelector('.content').scrollTop=300;
+    const card=document.getElementById('f-ticker').closest('.card');
+    if(card){card.style.boxShadow='0 0 0 2px var(--green)';setTimeout(()=>card.style.boxShadow='',1500);}
+  },150);
+}
+
+function showBrokerHistory(){
+  try{
+    const hist=JSON.parse(localStorage.getItem('tj4-broker-history')||'[]');
+    if(!hist.length){alert('Nog geen importhistorie.');return;}
+    document.getElementById('chart-popup-filters').style.display='none';
+    document.getElementById('chart-popup-title').innerHTML=`Import historie <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+    document.querySelector('#chart-popup .cw').innerHTML=`
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${hist.length} eerder geïmporteerde trades</div>
+      ${hist.slice().reverse().map((t,ri)=>{
+        const i=hist.length-1-ri;
+        return `<div onclick="importFromHistory(${i})" style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:.5px solid var(--border);cursor:pointer">
+          <div><span style="font-weight:600;color:var(--text2)">${t.ticker}</span>
+            <span style="font-size:10px;color:var(--text3);margin-left:6px">${t.dir}·${t.qty}×·${fmtDate(t.date,true)} ${t.time}</span></div>
+          <span style="font-size:12px;font-weight:700;color:${t.pnl>=0?'var(--green)':'var(--red)'}">${t.pnl>=0?'+':''}$${fmt(Math.abs(t.pnl),2)}</span>
+        </div>`;
+      }).join('')}`;
+    document.getElementById('chart-popup').style.display='flex';
+  }catch(e){alert('Geen historie.');}
+}
+
+function importFromHistory(i){
+  try{
+    const hist=JSON.parse(localStorage.getItem('tj4-broker-history')||'[]');
+    window._brokerParsed=hist; closeChartPopup(); importBrokerTrade(i);
+  }catch(e){}
+}
+
 function clearForm(){
   ['f-ticker','f-pnl','f-ru','f-link','f-notes'].forEach(id=>{ const el=document.getElementById(id); el.value=''; el.className=''; });
+  resetRules();
   document.querySelectorAll('#emo-grid .eo').forEach(e=>e.classList.remove('sel'));
   starVal=0; litStars(0); setDir('Long');
   // Paper standaard UIT
@@ -2633,6 +3064,7 @@ async function saveTrade(){
     pnl, ru, emos, stars: starVal,
     link: document.getElementById('f-link').value.trim(),
     notes: document.getElementById('f-notes').value.trim(),
+    rules: getRulesArray(),
     images: imgUrls, bt: {}
   };
   showSyncStatus('⏳ Opslaan...');
@@ -2715,9 +3147,14 @@ function openEdit(i){
       <div class="img-previews" id="e-img-previews"></div>
     </div>
     <div class="fg"><label>Screenshot link</label><input type="url" id="e-link" value="${t.link||''}"></div>
+    <div class="fg">
+      <label>✔ Actieplan controle — ✓ gevolgd / ✗ gebroken</label>
+      <div style="display:flex;flex-direction:column;gap:2px;border-radius:var(--rsm);border:.5px solid var(--border2);overflow:hidden" id="e-actieplan-wrapper"></div>
+    </div>
     <div class="fg"><label>Opmerkingen</label><textarea id="e-notes" placeholder="Vrije beschrijving, analyse, lessen..." style="min-height:80px;resize:vertical;font-family:inherit;font-size:13px">${t.notes||''}</textarea></div>
   `;
   renderEditPreviews();
+  setEditRulesFromArray(t.rules||[]);
   document.getElementById('edit-modal').style.display='flex';
 }
 
@@ -2779,6 +3216,7 @@ async function saveEdit(){
     stars: editStarVal, emos,
     link: document.getElementById('e-link').value.trim(),
     notes: document.getElementById('e-notes').value.trim(),
+    rules: getEditRulesArray(),
     images: [] // filled below
   };
 
@@ -3046,7 +3484,8 @@ function renderDash(){
   const ratingStars = avgRating > 0 ? starsPartial(avgRating, 16) : '—';
 
   const profitFactor = winPnls.length&&lossPnls.length?fmt(winPnls.reduce((a,b)=>a+b,0)/lossPnls.reduce((a,b)=>a+b,0),2):'-';
-  const maxDD = calcMaxDrawdown(sorted, startBalance);
+  const {maxDD, peakIdx, troughIdx, peakEq, troughEq} = calcMaxDrawdown(sorted, startBalance);
+  const maxDDpct = startBalance > 0 ? fmt(maxDD/startBalance*100,1) : '0';
   const avgDailyPnl = days>0?totalPnl/days:0;
 
   // Render risk entries widget
@@ -3060,7 +3499,7 @@ function renderDash(){
     <div class="m"><div class="ml">Trades/dag</div><div class="mv">${avgT}</div><div class="ms">${days} dagen</div></div>
     <div class="m"><div class="ml">P&amp;L Totaal</div><div class="mv ${totalPnl>=0?'pos':'neg'}">${fmtU(totalPnl)}</div><div class="ms">balans $${fmt(bal,0)}</div></div>
     <div class="m"><div class="ml">Profit factor</div><div class="mv">${profitFactor}</div></div>
-    <div class="m"><div class="ml">Max drawdown</div><div class="mv neg">-$${fmt(maxDD,0)}</div></div>
+    <div class="m" style="cursor:pointer" onclick="openMaxDDPopup()" title="Klik voor detail"><div class="ml">Max drawdown ↗</div><div class="mv neg">-$${fmt(maxDD,0)}</div><div class="ms">${maxDDpct}% van balans</div></div>
     <div class="m" title="Winrate × Gem.Win.R + Lossrate × Gem.Verlies.R"><div class="ml">Expectancy</div><div class="mv ${expColor}">${expStr}</div><div class="ms">${expUSD!==null?expUSDStr+' per trade':''}</div></div>
     <div class="m" title="Gem. R van de laatste ${rollingCount} trades"><div class="ml">Rolling exp.</div><div class="mv ${rollingStr.startsWith('+')?'pos':'neg'}">${rollingStr}</div><div class="ms">laatste ${rollingCount} trades</div></div>
   `;
@@ -3140,14 +3579,91 @@ function renderDash(){
   renderBtChart(all);
   renderMissedChart(all);
   renderStreaks(all);
+  renderActieplanStats(all);
   renderWeekdayChart(all);
   renderHourChart(all);
 }
 
 function calcMaxDrawdown(sorted, startBal){
   let peak = startBal, eq = startBal, maxDD = 0;
-  sorted.forEach(t=>{ eq+=+t.pnl||0; peak=Math.max(peak,eq); maxDD=Math.max(maxDD,peak-eq); });
-  return maxDD;
+  let peakEq = startBal, troughEq = startBal;
+  let peakIdx = -1, troughIdx = -1, curPeakIdx = -1;
+  sorted.forEach((t,i)=>{
+    eq += +t.pnl||0;
+    if(eq >= peak){ peak = eq; curPeakIdx = i; }
+    const dd = peak - eq;
+    if(dd > maxDD){ maxDD=dd; peakEq=peak; troughEq=eq; peakIdx=curPeakIdx; troughIdx=i; }
+  });
+  return {maxDD, peakIdx, troughIdx, peakEq, troughEq};
+}
+
+function openMaxDDPopup(){
+  const all = getFilteredTrades();
+  const sorted = [...all].sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+  const {maxDD, peakIdx, troughIdx, peakEq, troughEq} = calcMaxDrawdown(sorted, startBalance);
+
+  if(maxDD === 0){ alert('Geen drawdown — alle trades zijn winstgevend!'); return; }
+
+  const peakTrade  = peakIdx  >= 0 ? sorted[peakIdx]  : null;
+  const troughTrade= sorted[troughIdx];
+  const ddTrades   = sorted.slice(peakIdx+1, troughIdx+1);
+  const totalPnl   = ddTrades.reduce((s,t)=>s+(+t.pnl||0),0);
+  const totalRu    = ddTrades.reduce((s,t)=>s+(+t.ru||0),0);
+  const wins       = ddTrades.filter(t=>+t.pnl>0).length;
+  const losses     = ddTrades.filter(t=>+t.pnl<0).length;
+
+  // Mini SVG equity chart from peak to trough
+  const pts = [peakEq, ...ddTrades.map((t,i)=> ddTrades.slice(0,i+1).reduce((s,x)=>s+(+x.pnl||0), peakEq))];
+  const minV = Math.min(...pts), maxV = Math.max(...pts), range = maxV-minV||1;
+  const H=60, W=100;
+  const toX = (i,n) => Math.round(i/(n-1)*(W-4))+2;
+  const toY = v => H-2-Math.round((v-minV)/range*(H-6));
+  const polyPts = pts.map((v,i)=>`${toX(i,pts.length)},${toY(v)}`).join(' ');
+  const miniChart = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px;display:block;margin-bottom:12px">
+    <polyline points="${polyPts}" fill="none" stroke="rgba(244,63,94,.8)" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="${toX(0,pts.length)}" cy="${toY(peakEq)}" r="3" fill="var(--green)" title="Piek"/>
+    <circle cx="${toX(pts.length-1,pts.length)}" cy="${toY(troughEq)}" r="3" fill="var(--red)" title="Dal"/>
+  </svg>`;
+
+  document.getElementById('chart-popup-filters').style.display='none';
+  document.getElementById('chart-popup-title').innerHTML =
+    `Max Drawdown analyse <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+  document.querySelector('#chart-popup .cw').innerHTML = `
+    <div style="background:rgba(244,63,94,.08);border:.5px solid rgba(244,63,94,.25);border-radius:var(--rsm);padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.65;color:var(--text2)">
+      <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:6px">Wat is Max Drawdown?</div>
+      De grootste <b>aaneengesloten daling</b> van een piek naar een dal in je cumulatieve P&L — niet één grote verliezende trade, maar een reeks.
+      <div style="margin-top:8px;color:var(--text3)">
+        <b>Wat leer je ervan:</b> hoe groot je slechtste periode was. &lt;10% van balans is gezond. &gt;20% is een signaal om je positiegrootte te herzien.
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px">
+      <div class="m"><div class="ml">Drawdown</div><div class="mv neg">-$${fmt(maxDD,0)}</div></div>
+      <div class="m"><div class="ml">Piek equity</div><div class="mv">$${fmt(peakEq,0)}</div><div class="ms">${peakTrade?fmtDate(peakTrade.date,true):'start'}</div></div>
+      <div class="m"><div class="ml">Dal equity</div><div class="mv neg">$${fmt(troughEq,0)}</div><div class="ms">${fmtDate(troughTrade.date,true)}</div></div>
+      <div class="m"><div class="ml">Trades in DD</div><div class="mv">${ddTrades.length}</div><div class="ms">${wins}W ${losses}L</div></div>
+      <div class="m"><div class="ml">Totaal P&L</div><div class="mv neg">${fmtU(totalPnl)}</div></div>
+      <div class="m"><div class="ml">Totaal RU</div><div class="mv neg">${fmt(totalRu,2)}R</div></div>
+    </div>
+    ${miniChart}
+    <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">
+      Trades tijdens de drawdown (${peakTrade?fmtDate(peakTrade.date,true):'start'} → ${fmtDate(troughTrade.date,true)})
+    </div>
+    ${ddTrades.map(t=>{
+      const idx=trades.indexOf(t);
+      const pnlC=+t.pnl>0?'var(--green)':+t.pnl<0?'var(--red)':'var(--text3)';
+      return `<div onclick="openTradeDetail(${idx});closeChartPopup()" style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;padding:7px 0;border-bottom:.5px solid var(--border);cursor:pointer">
+        <div>
+          <span style="font-size:12px;font-weight:600;color:var(--text2)">${t.ticker}</span>
+          <span style="font-size:10px;color:var(--text3);margin-left:6px">${fmtDate(t.date,true)} ${t.time||''}</span>
+          <span style="font-size:10px;color:var(--text3);margin-left:4px">${t.strat||''}</span>
+        </div>
+        <span style="font-size:11px;color:var(--text3)">${t.dir||''}</span>
+        <span style="font-size:12px;font-weight:600;color:${pnlC}">${fmtU(+t.pnl||0)}</span>
+        <span style="font-size:11px;color:${+t.ru>=0?'var(--green)':'var(--red)'}">${+t.ru>=0?'+':''}${fmt(+t.ru||0,2)}R</span>
+      </div>`;
+    }).join('')}
+  `;
+  document.getElementById('chart-popup').style.display='flex';
 }
 
 function toggleEqTickers(){
@@ -3887,18 +4403,58 @@ function openMissedStratPopup(stratName){
 
 function renderStreaks(all){
   const sorted=[...all].sort((a,b)=>a.date.localeCompare(b.date));
+
+  // Win/loss streaks
   let curW=0,curL=0,maxW=0,maxL=0;
   sorted.forEach(t=>{ if(+t.pnl>0){curW++;curL=0;maxW=Math.max(maxW,curW);}else if(+t.pnl<0){curL++;curW=0;maxL=Math.max(maxL,curL);}else{curW=0;curL=0;}});
+
+  // Huidige reeks (vanaf laatste trade terug)
+  let curStreak=0, curStreakType='';
+  for(let i=sorted.length-1;i>=0;i--){
+    const pnl=+sorted[i].pnl;
+    if(i===sorted.length-1){ curStreakType=pnl>0?'W':pnl<0?'L':'BE'; curStreak=1; }
+    else if((pnl>0&&curStreakType==='W')||(pnl<0&&curStreakType==='L')) curStreak++;
+    else break;
+  }
+  const curStreakColor = curStreakType==='W'?'pos':curStreakType==='L'?'neg':'';
+  const curStreakLabel = curStreakType==='W'?`${curStreak}× winst`:curStreakType==='L'?`${curStreak}× verlies`:`${curStreak}× BE`;
+
+  // Dag statistieken
   const daysPnl={};
   sorted.forEach(t=>{ daysPnl[t.date]=(daysPnl[t.date]||0)+(+t.pnl||0); });
+  const dayEntries=Object.entries(daysPnl);
   const dayVals=Object.values(daysPnl);
   const bestDay=dayVals.length?Math.max(...dayVals):0;
   const worstDay=dayVals.length?Math.min(...dayVals):0;
+  const bestDayDate=dayEntries.find(([,v])=>v===bestDay)?.[0]||'';
+  const worstDayDate=dayEntries.find(([,v])=>v===worstDay)?.[0]||'';
+
+  // Consistency: % handelsdagen met positief resultaat
+  const profitDays=dayVals.filter(v=>v>0).length;
+  const totalDays=dayVals.length;
+  const consistency=totalDays>0?Math.round(profitDays/totalDays*100):0;
+  const consistencyColor=consistency>=60?'pos':consistency>=40?'':'neg';
+
+  // Beste / slechtste trade
+  const byPnl=[...sorted].sort((a,b)=>(+b.pnl||0)-(+a.pnl||0));
+  const bestTrade=byPnl[0]||null;
+  const worstTrade=byPnl[byPnl.length-1]||null;
+
+  // Calmar ratio: totaal RU / max drawdown% van startbalans
+  const {maxDD}=calcMaxDrawdown(sorted, startBalance);
+  const totalRU=sorted.reduce((s,t)=>s+(+t.ru||0),0);
+  const calmar=maxDD>0&&startBalance>0 ? fmt(Math.abs(totalRU)/(maxDD/startBalance*100),2) : '∞';
+
   document.getElementById('streak-stats').innerHTML=`
-    <div class="m"><div class="ml">Beste reeks</div><div class="mv pos">${maxW} wins</div></div>
-    <div class="m"><div class="ml">Slechtste reeks</div><div class="mv neg">${maxL} verlies</div></div>
-    <div class="m"><div class="ml">Beste dag</div><div class="mv pos">${fmtU(bestDay)}</div></div>
-    <div class="m"><div class="ml">Slechtste dag</div><div class="mv neg">${fmtU(worstDay)}</div></div>
+    <div class="m"><div class="ml">Beste reeks</div><div class="mv pos">${maxW}× winst</div></div>
+    <div class="m"><div class="ml">Slechtste reeks</div><div class="mv neg">${maxL}× verlies</div></div>
+    <div class="m"><div class="ml">Huidige reeks</div><div class="mv ${curStreakColor}">${sorted.length?curStreakLabel:'—'}</div></div>
+    <div class="m" title="% handelsdagen met positief dagresultaat"><div class="ml">Consistency</div><div class="mv ${consistencyColor}">${totalDays?consistency+'%':'—'}</div><div class="ms">${profitDays}/${totalDays} dagen groen</div></div>
+    <div class="m" title="Totaal RU gedeeld door Max Drawdown% — hoe hoger hoe beter het rendement vs risico"><div class="ml">Calmar ratio</div><div class="mv">${calmar}</div><div class="ms">rendement/risico</div></div>
+    <div class="m" style="${bestTrade?'cursor:pointer':''}" onclick="${bestTrade?'openTradeDetail('+trades.indexOf(bestTrade)+')':''}" title="${bestTrade?'Klik om te openen':''}"><div class="ml">Beste trade${bestTrade?' ↗':''}</div><div class="mv pos">${bestTrade?fmtU(+bestTrade.pnl):'-'}</div><div class="ms">${bestTrade?bestTrade.ticker+' '+fmtDate(bestTrade.date,true):''}</div></div>
+    <div class="m" style="${worstTrade?'cursor:pointer':''}" onclick="${worstTrade?'openTradeDetail('+trades.indexOf(worstTrade)+')':''}" title="${worstTrade?'Klik om te openen':''}"><div class="ml">Slechtste trade${worstTrade?' ↗':''}</div><div class="mv neg">${worstTrade?fmtU(+worstTrade.pnl):'-'}</div><div class="ms">${worstTrade?worstTrade.ticker+' '+fmtDate(worstTrade.date,true):''}</div></div>
+    <div class="m"><div class="ml">Beste dag</div><div class="mv pos">${fmtU(bestDay)}</div><div class="ms">${bestDayDate?fmtDate(bestDayDate,true):''}</div></div>
+    <div class="m"><div class="ml">Slechtste dag</div><div class="mv neg">${fmtU(worstDay)}</div><div class="ms">${worstDayDate?fmtDate(worstDayDate,true):''}</div></div>
   `;
 }
 
@@ -4053,6 +4609,7 @@ function exportCSV(){
 // ============================================================
 buildLogFilters();
 buildDashFilters();
+renderActieplan();
 rebuildStratDropdowns();
 renderLog(); // show empty state immediately
 loadFromSupabase(); // then load real data
