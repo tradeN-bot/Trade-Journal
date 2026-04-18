@@ -20,7 +20,7 @@
   --red:#f43f5e; --red-bg:rgba(244,63,94,0.13);
   --blue:#3b82f6; --blue-bg:rgba(59,130,246,0.13);
   --amber:#f59e0b; --purple:#8b5cf6; --teal:#14b8a6;
-  --paper:#a78bfa; --paper-bg:rgba(167,139,250,0.13);
+  --paper:#a78bfa; --paper-bg:rgba(167,139,250,0.13); --import:#22d3ee; --import-bg:rgba(34,211,238,0.10);
   --r:10px; --rsm:7px;
   --safe-b:env(safe-area-inset-bottom,0px);
 }
@@ -150,6 +150,7 @@ table.tlog th.sort-desc::after{content:' ↓';color:var(--green)}
 table.tlog td{padding:7px 8px;border-bottom:.5px solid var(--border);white-space:nowrap;vertical-align:middle}
 table.tlog tr:hover td{background:rgba(255,255,255,.02)}
 table.tlog tr.paper-row td{color:var(--paper)}
+table.tlog tr.import-row td{color:#22d3ee}
 .pill{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;white-space:nowrap;display:inline-block}
 .pl{background:var(--green-bg);color:var(--green)}
 .ps{background:var(--red-bg);color:var(--red)}
@@ -871,6 +872,7 @@ function rowToTrade(r){
     date: r.date||'', time: r.time||'',
     ticker: r.ticker||'', dir: r.dir||'Long',
     isPaper: r.is_paper||false,
+    isImported: r.is_imported||false,
     strat: r.strat||'', plan: r.plan||'Ja',
     pnl: parseFloat(r.pnl)||0, ru: parseFloat(r.ru)||0,
     stars: r.stars||0,
@@ -886,6 +888,7 @@ function tradeToRow(t){
     date: t.date, time: t.time,
     ticker: t.ticker, dir: t.dir,
     is_paper: t.isPaper||false,
+    is_imported: t.isImported||false,
     strat: t.strat, plan: t.plan,
     pnl: t.pnl, ru: t.ru,
     stars: t.stars||0,
@@ -903,6 +906,7 @@ function migrateTrades(){
     if(!t.strat && t.strategy) t.strat = t.strategy;
     if(!t.dir && t.direction) t.dir = t.direction;
     if(typeof t.isPaper === 'undefined') t.isPaper = false;
+    if(typeof t.isImported === 'undefined') t.isImported = false;
     if(!t.images) t.images = [];
     if(!t.bt) t.bt = {};
   });
@@ -1858,12 +1862,12 @@ function renderLog(){
     const emos = (t.emos||[]).slice(0,2).join(', ')+(((t.emos||[]).length>2)?'…':'');
     const hasMedia = (t.images&&t.images.length>0) || t.link;
     const hasBt    = t.bt && Object.keys(t.bt).length>0;
-    return `<tr class="${t.isPaper?'paper-row':''}" style="cursor:pointer" onclick="openTradeDetail(${idx})">
+    return `<tr class="${t.isPaper?'paper-row':t.isImported?'import-row':''}" style="cursor:pointer" onclick="openTradeDetail(${idx})">
       <td>${t.date}</td>
       <td>${t.time||''}</td>
       <td><strong>${t.ticker}</strong></td>
       <td><span class="pill ${t.dir==='Long'?'pl':'ps'}">${t.dir==='Long'?'↑':'↓'} ${t.dir}</span></td>
-      <td>${t.isPaper?'<span class="pill pp">📄 Paper</span>':'<span class="pill" style="background:var(--bg3);color:var(--text3)">Live</span>'}</td>
+      <td>${t.isPaper?'<span class="pill pp">📄 Paper</span>':t.isImported?'<span class="pill" style="background:var(--import-bg);color:var(--import)">⬇ Import</span>':'<span class="pill" style="background:var(--bg3);color:var(--text3)">Live</span>'}</td>
       <td><span class="pill pst">${t.strat||''}</span></td>
       <td><span class="pill ${t.plan==='Ja'?'py':'pn'}">${t.plan==='Ja'?'✓':'✗'} ${t.plan}</span></td>
       <td style="color:${pnlColor};font-weight:700;font-variant-numeric:tabular-nums">$${fmt(pnl)}</td>
@@ -2849,124 +2853,412 @@ function showBrokerError(msg){
 }
 
 function parseNum(s){
+  // Generic number parser (used for P&L - can be negative, has decimals)
   if(!s) return 0;
-  s=String(s).replace(/USD|EUR|\$/g,'').trim();
+  s=String(s).replace(/USD|EUR|\$|€/g,'').trim();
+  if(!s||s==='-'||s==='+') return 0;
+  const neg=s.startsWith('-'); s=s.replace(/^[+-]/,'');
   const lc=s.lastIndexOf(','), ld=s.lastIndexOf('.');
-  if(lc>ld) s=s.replace(/\./g,'').replace(',','.');
-  else s=s.replace(/,/g,'');
-  return parseFloat(s)||0;
+  if(lc>ld){
+    // EU format: comma=decimal
+    s=s.replace(/\./g,'').replace(',','.');
+  } else if(ld>0){
+    // Check EU thousands (e.g. "1.000", "2.000")
+    if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+    else s=s.replace(/,/g,'');
+  }
+  const r=parseFloat(s)||0;
+  return neg?-r:r;
 }
+
+function parseQty(s){
+  // Parse quantity — always integer-like, handles EU thousands (1.000 → 1000)
+  // Also handles fractional (0,01 → 0.01 for FX/crypto)
+  if(!s) return 0;
+  s=String(s).replace(/USD|EUR|\$|€/g,'').trim();
+  if(!s) return 0;
+  const neg=s.startsWith('-'); s=s.replace(/^[+-]/,'');
+  const lc=s.lastIndexOf(','), ld=s.lastIndexOf('.');
+  let result;
+  if(lc>ld){
+    // EU format: comma=decimal separator
+    // Quantity with decimal = fractional (e.g. 0,01 XAUUSD)
+    s=s.replace(/\./g,'').replace(',','.');
+    result=parseFloat(s)||0;
+  } else if(ld>0){
+    if(/^\d{1,3}(\.\d{3})+$/.test(s)){
+      // EU thousands: "1.000"→1000, "2.000"→2000
+      s=s.replace(/\./g,'');
+      result=parseFloat(s)||0;
+    } else {
+      // Dot=decimal: "1.50" → 1.5 (could be FX qty)
+      result=parseFloat(s)||0;
+    }
+  } else {
+    result=parseFloat(s)||0;
+  }
+  return neg?-result:result;
+}
+
+function parsePrice(s){
+  // Parse price — float, handles EU/US formats
+  if(!s) return 0;
+  s=String(s).replace(/USD|EUR|\$|€/g,'').trim();
+  if(!s||s==='-'||s==='+') return 0;
+  const neg=s.startsWith('-'); s=s.replace(/^[+-]/,'');
+  const lc=s.lastIndexOf(','), ld=s.lastIndexOf('.');
+  if(lc>ld){
+    s=s.replace(/\./g,'').replace(',','.');
+  } else if(ld>0){
+    if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+    else s=s.replace(/,/g,'');
+  }
+  const r=parseFloat(s)||0;
+  return neg?-r:r;
+}
+
+function detectBrokerFormat(rows){
+  // Scores each column for ticker, action, qty, price, datetime, pnl
+  const nRows=Math.min(rows.length,15);
+  const nCols=Math.max(...rows.slice(0,nRows).map(r=>r.length));
+  const map={ticker:-1,action:-1,qty:-1,price:-1,datetime:-1,pnl:-1};
+
+  // Step 1: Find obvious columns by content type
+  let dtCol=-1, tickerCol=-1, actionCol=-1;
+  const colAvg=[], colHasNeg=[], colNonZero=[], colIsFloat=[], colIsInt=[];
+
+  for(let c=0;c<nCols;c++){
+    let dtScore=0,tickScore=0,actScore=0,intScore=0,floatScore=0,negCount=0,nonZero=0;
+    let sum=0,n=0;
+    for(let r=0;r<nRows;r++){
+      const v=(rows[r][c]||'').trim().replace(/USD|EUR|€|\$/g,'').trim();
+      if(!v) continue;
+      // Datetime: has date separator + colon
+      if(/\d{1,4}[-\/]\d{1,2}[-\/]\d{2,4}/.test(v)&&/\d{2}:\d{2}/.test(v)) dtScore+=5;
+      // Ticker: 1-6 uppercase letters only
+      if(/^[A-Z]{1,6}$/.test(v)) tickScore+=3;
+      // Action: Buy/Sell variants
+      if(/^(buy|sell|long|short|b|s|koop|verkoop)$/i.test(v)) actScore+=5;
+      // Numeric
+      const lc=v.lastIndexOf(','),ld=v.lastIndexOf('.');
+      let ns=v;
+      if(lc>ld) ns=v.replace(/\./g,'').replace(',','.');
+      else ns=v.replace(/,/g,'');
+      const num=parseFloat(ns);
+      if(!isNaN(num)){
+        if(Number.isInteger(num)&&num>0&&num<100000&&!v.includes('.')) intScore++;
+        else if(num!==0&&Math.abs(num)>0.01) floatScore++;
+        if(num<0) negCount++;
+        if(num!==0){ nonZero++; sum+=Math.abs(num); n++; }
+      }
+    }
+    if(dtScore>0&&dtCol<0) dtCol=c;
+    if(tickScore>=2&&tickerCol<0) tickerCol=c;
+    if(actScore>=2&&actionCol<0) actionCol=c;
+    colAvg[c]=n?sum/n:0;
+    colHasNeg[c]=negCount>0;
+    colNonZero[c]=nonZero;
+    colIsInt[c]=intScore;
+    colIsFloat[c]=floatScore;
+  }
+
+  map.datetime=dtCol;
+  map.ticker=tickerCol;
+  map.action=actionCol;
+
+  // Step 2: Among numeric cols (not ticker/action/datetime), find price and qty
+  // Price = higher average value; qty = lower average, integer-like
+  const numCols=[];
+  for(let c=0;c<nCols;c++){
+    if(c===dtCol||c===tickerCol||c===actionCol) continue;
+    if(colIsInt[c]>0||colIsFloat[c]>0) numCols.push(c);
+  }
+  numCols.sort((a,b)=>colAvg[b]-colAvg[a]);
+  if(numCols.length>=1) map.price=numCols[0]; // highest avg = price
+  if(numCols.length>=2) map.qty=numCols[1];   // second = qty
+
+  // Step 3: Find NET P&L column
+  // STRATEGY: Net P&L is always at dtCol+2 (after datetime and exchange columns)
+  // This is the most reliable heuristic — do not override with heuristic fallbacks
+  // Format: ... | Price | Fee | Datetime | Exchange | Net_P&L | ...
+  //                              dtCol      dtCol+1    dtCol+2
+  const afterDt = dtCol >= 0 ? dtCol + 2 : -1;
+
+  function colHasAnyNumeric(c){
+    if(c < 0 || c >= nCols) return false;
+    for(let r = 0; r < nRows; r++){
+      const v = (rows[r][c]||'').trim().replace(/USD|EUR|€|\$|,/g,'').replace(/\./g,'');
+      if(v && !isNaN(parseFloat(v))) return true;
+    }
+    return false;
+  }
+
+  // First choice: dtCol+2 if it has numeric data and isn't price/qty
+  if(afterDt >= 0 && afterDt < nCols && colHasAnyNumeric(afterDt)
+     && afterDt !== map.price && afterDt !== map.qty){
+    map.pnl = afterDt;
+  }
+
+  // Second choice: dtCol+1 (one after datetime) if dtCol+2 failed
+  if(map.pnl < 0){
+    const altCol = dtCol >= 0 ? dtCol + 1 : -1;
+    if(altCol >= 0 && altCol < nCols && colHasAnyNumeric(altCol)
+       && altCol !== map.price && altCol !== map.qty && altCol !== map.action){
+      map.pnl = altCol;
+    }
+  }
+
+  // Last resort: scan for any numeric col not already mapped
+  if(map.pnl < 0){
+    for(let c = 0; c < nCols; c++){
+      if([map.price,map.qty,map.datetime,map.ticker,map.action].includes(c)) continue;
+      if(colHasAnyNumeric(c)){ map.pnl = c; break; }
+    }
+  }
+
+  return map;
+}
+
 
 function parseBrokerData(text){
   const lines=text.trim().split('\n').map(l=>l.trim()).filter(Boolean);
   if(!lines.length) throw new Error('Geen data gevonden.');
 
-  // Detect format by checking if column 3 looks like a status word or a number
-  // Format 1 (volledig): col2=status(Filled/Cancelled), col5=prijs, col6=qty, col7=datetime
-  // Format 2 (filled):   col1=action, col2=qty(number), col3=prijs, col4=P&L, col6=datetime
-  const firstData = lines[0].split('\t');
-  const col2 = (firstData[2]||'').trim();
-  const isFilledFormat = !isNaN(parseNum(col2)) && parseNum(col2) > 0 && parseNum(col2) < 100000;
+  const allRows=lines.map(l=>l.split('\t'));
 
-  let rows = [];
+  // Skip header row if first column looks like a label
+  const firstVal=(allRows[0][0]||'').trim().toLowerCase();
+  const dataRows=/^(date|time|ticker|symbol|side|action)/.test(firstVal)
+    ? allRows.slice(1) : allRows;
 
-  if(isFilledFormat){
-    // Format 2: Ticker | Buy/Sell | Qty | Price | Commission | P&L_partial | Datetime | Exchange | ...
-    rows = lines.map(line=>{
-      const c=line.split('\t');
-      const ticker=(c[0]||'').trim().toUpperCase();
-      const action=(c[1]||'').trim();
-      const qty   =parseInt(parseNum(c[2]));
-      const price =parseNum(c[3]);
-      const pnl   =parseNum(c[5]); // partial P&L per row
-      const dt    =(c[6]||'').trim();
-      return {ticker,action,qty,price,pnl,datetime:dt,format:2};
-    }).filter(r=>r.ticker&&(/buy|sell/i.test(r.action))&&r.qty>0&&r.price>0);
-  } else {
-    // Format 1: Ticker | Action | Status | OrderID | Type | Price | Qty | Datetime | ...
-    // Detect header
-    const firstLower=lines[0].toLowerCase();
-    const hasHeader=/ticker|symbol|action/.test(firstLower);
-    const data=hasHeader?lines.slice(1):lines;
-    rows = data.map(line=>{
-      const c=line.split('\t');
-      const ticker=(c[0]||'').trim().toUpperCase();
-      const action=(c[1]||'').trim();
-      const status=(c[2]||'').trim();
-      const price =parseNum(c[5]);
-      const qty   =parseInt((c[6]||'0').replace(/[, ]/g,''))||0;
-      const dt    =(c[7]||'').trim();
-      return {ticker,action,status,qty,price,datetime:dt,format:1};
-    }).filter(r=>r.ticker&&/fill/i.test(r.status)&&r.price>0&&r.qty>0);
+  if(!dataRows.length) throw new Error('Geen datarijen gevonden.');
+
+  // ── Column detection ──────────────────────────────────────────────────────
+  // Find datetime column (has date pattern + time)
+  const nRows=Math.min(dataRows.length,15);
+  const nCols=Math.max(...dataRows.slice(0,nRows).map(r=>r.length));
+  let dtCol=-1;
+  for(let c=0;c<nCols&&dtCol<0;c++){
+    for(let r=0;r<nRows;r++){
+      const v=(dataRows[r][c]||'').trim();
+      if(/\d{1,4}[-\/]\d{1,2}[-\/]\d{2,4}/.test(v)&&/\d{2}:\d{2}/.test(v)){
+        dtCol=c; break;
+      }
+    }
   }
+  if(dtCol<0) throw new Error('Kon datum/tijd kolom niet vinden.');
 
-  if(!rows.length){
-    throw new Error(isFilledFormat
-      ? 'Geen geldige rijen gevonden. Verwacht: Ticker | Buy/Sell | Aantal | Prijs | ... | P&L | Datum'
-      : 'Geen Filled orders gevonden. Controleer kolom 3 (Status=Filled), kolom 6 (Prijs) en kolom 7 (Aantal).');
-  }
+  // Fee is always 1 column BEFORE datetime
+  // Net P&L is always datetime+2 (after exchange)
+  const feeCol = dtCol - 1;
+  const pnlCol = dtCol + 2;
 
-  // Group by ticker + date
-  const groups={};
+  // Parse rows
+  const rows=dataRows.map(r=>{
+    const ticker=(r[0]||'').trim().toUpperCase();
+    const action=(r[1]||'').trim().toLowerCase();
+    const qty   =parseQty(r[2]||'');
+    const price =parseNum(r[3]||'');
+    const fee   =parseNum(feeCol>=0?(r[feeCol]||''):'');
+    const dt    =(r[dtCol]||'').trim();
+    const net   =parseNum(pnlCol<r.length?(r[pnlCol]||''):'');
+
+    if(!ticker||!/^[A-Z]{1,8}$/.test(ticker)) return null;
+    if(!/^(buy|sell)/.test(action)) return null;
+    if(qty<=0||price<=0) return null;
+
+    // Parse datetime → ISO date + time
+    const dtParts=dt.split(' ');
+    const dp=dtParts[0].split(/[-\/]/);
+    if(dp.length!==3) return null;
+    const isoDate=dp[0].length===4
+      ? `${dp[0]}-${dp[1].padStart(2,'0')}-${dp[2].padStart(2,'0')}`
+      : `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
+    const timePart=dtParts.length>1?dtParts[1].slice(0,5):'';
+
+    // KEY LOGIC: fee == net P&L → OPENING position (no realized gain)
+    //            fee != net P&L → CLOSING position (realized gain/loss = net)
+    const isOpen = Math.abs(fee - net) < 0.002;
+
+    return {ticker,action,qty,price,fee,net,isOpen,
+            date:isoDate,time:timePart,dt:isoDate+' '+timePart};
+  }).filter(Boolean);
+
+  if(!rows.length) throw new Error('Geen geldige orders gevonden (ticker A-Z, buy/sell, qty>0, price>0).');
+
+  // ── Group by ticker, then build trades ────────────────────────────────────
+  const byTicker={};
   rows.forEach(r=>{
-    const dtParts=r.datetime.split(' ');
-    const dp=dtParts[0].split('-');
-    const isoDate=dp[0].length===4?dtParts[0]:`${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
-    const timePart=dtParts.slice(1).join(' ').slice(0,5)||'';
-    const key=r.ticker+'|'+isoDate;
-    if(!groups[key]) groups[key]={ticker:r.ticker,isoDate,buys:[],sells:[],format:r.format};
-    const entry={...r,isoDate,timePart};
-    if(/buy/i.test(r.action)) groups[key].buys.push(entry);
-    else groups[key].sells.push(entry);
+    if(!byTicker[r.ticker]) byTicker[r.ticker]=[];
+    byTicker[r.ticker].push(r);
   });
 
   const result=[];
-  Object.values(groups).forEach(g=>{
-    if(!g.buys.length||!g.sells.length) return;
-    const entryRows=g.buys.sort((a,b)=>a.datetime.localeCompare(b.datetime));
-    const exitRows =g.sells.sort((a,b)=>a.datetime.localeCompare(b.datetime));
-    const entryQty =entryRows.reduce((s,r)=>s+r.qty,0);
-    const exitQty  =exitRows.reduce((s,r)=>s+r.qty,0);
-    const avgEntry =entryRows.reduce((s,r)=>s+r.price*r.qty,0)/entryQty;
-    const avgExit  =exitRows.reduce((s,r)=>s+r.price*r.qty,0)/exitQty;
-    const matchQty =Math.min(entryQty,exitQty);
-    // Use sum of partial P&Ls if format 2, else calculate
-    const pnl = g.format===2
-      ? Math.round(exitRows.reduce((s,r)=>s+r.pnl,0)*100)/100
-      : Math.round((avgExit-avgEntry)*matchQty*100)/100;
 
-    result.push({
-      ticker:g.ticker, date:g.isoDate,
-      time:entryRows[0].timePart,
-      dir:'Long', qty:matchQty,
-      avgEntry:Math.round(avgEntry*10000)/10000,
-      avgExit :Math.round(avgExit*10000)/10000,
-      pnl, partials:exitRows.length
+  Object.entries(byTicker).forEach(([ticker,tickerRows])=>{
+    const sorted=tickerRows.slice().sort((a,b)=>a.dt.localeCompare(b.dt));
+
+    let position=0;
+    let currentRows=[];
+    let currentDir='';
+
+    const flushTrade=()=>{
+      if(!currentRows.length) return;
+      const opens =currentRows.filter(r=>r.isOpen);
+      const closes=currentRows.filter(r=>!r.isOpen);
+      if(!opens.length||!closes.length){ currentRows=[];return; }
+
+      const entryQty=opens.reduce((s,r)=>s+r.qty,0);
+      const exitQty =closes.reduce((s,r)=>s+r.qty,0);
+      const matchQty=Math.min(entryQty,exitQty);
+      const avgEntry=opens.reduce((s,r)=>s+r.price*r.qty,0)/entryQty;
+      const avgExit =closes.reduce((s,r)=>s+r.price*r.qty,0)/exitQty;
+      const totalNet=Math.round(currentRows.reduce((s,r)=>s+r.net,0)*100)/100;
+
+      result.push({
+        ticker, date:opens[0].date, time:opens[0].time,
+        dir:currentDir, qty:matchQty,
+        avgEntry:Math.round(avgEntry*10000)/10000,
+        avgExit :Math.round(avgExit*10000)/10000,
+        pnl:totalNet, partials:closes.length,
+        imported:false
+      });
+      currentRows=[];
+    };
+
+    sorted.forEach(r=>{
+      if(r.isOpen){
+        // Opening or scaling into a position
+        if(position===0){
+          // Start fresh trade
+          currentRows=[];
+          currentDir=r.action==='buy'?'Long':'Short';
+        }
+        currentRows.push(r);
+        position=Math.round((position+(r.action==='buy'?r.qty:-r.qty))*1e6)/1e6;
+      } else {
+        // Closing row
+        if(!currentRows.length){
+          // No open position → carry-over from previous day, skip
+          return;
+        }
+        currentRows.push(r);
+        position=Math.round((position-(r.action==='sell'?r.qty:-r.qty))*1e6)/1e6;
+        if(Math.abs(position)<0.0002){
+          flushTrade();
+          position=0;
+          currentDir='';
+        }
+      }
     });
+
+    // Flush any remaining partial trade
+    if(currentRows.length) flushTrade();
   });
 
-  if(!result.length) throw new Error('Trades konden niet worden samengesteld. Zijn er zowel Buy als Sell orders?');
-  return result.sort((a,b)=>a.date.localeCompare(b.date));
+  if(!result.length) throw new Error('Geen complete trades gevonden (elke trade heeft open én sluit orders nodig).');
+  return result.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
 }
+
 
 function showBrokerResult(parsed){
   const el=document.getElementById('broker-parse-result');
   window._brokerParsed=parsed;
-  el.innerHTML=`
-    <div style="font-size:12px;color:var(--green);margin-bottom:8px">✓ ${parsed.length} trade(s) herkend</div>
-    ${parsed.map((t,i)=>`
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg3);border-radius:var(--rsm);margin-bottom:6px;border:.5px solid var(--border2)">
-        <div>
-          <span style="font-weight:600;color:var(--text)">${t.ticker}</span>
-          <span style="font-size:11px;color:var(--text3);margin-left:6px">${t.dir} · ${t.qty}× · ${fmtDate(t.date,true)} ${t.time}</span>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">entry $${fmt(t.avgEntry,2)} → exit $${fmt(t.avgExit,2)} · ${t.partials} deelsluitingen</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-weight:700;color:${t.pnl>=0?'var(--green)':'var(--red)'}">${t.pnl>=0?'+':''}$${fmt(Math.abs(t.pnl),2)}</span>
-          <button onclick="importBrokerTrade(${i})" style="font-size:11px;padding:5px 12px;background:var(--green);color:#fff;border:none;border-radius:var(--rsm);cursor:pointer">Importeren →</button>
-        </div>
-      </div>`).join('')}`;
+  renderBrokerResult();
 }
+
+function fmtQty(q){
+  // Show decimals for fractional quantities (e.g. XAUUSD 0.01)
+  if(q < 1) return q.toFixed(2);
+  if(!Number.isInteger(q)) return q.toFixed(2);
+  return q.toString();
+}
+
+function renderBrokerResult(){
+  const parsed=window._brokerParsed||[];
+  const el=document.getElementById('broker-parse-result');
+  if(!el||!parsed.length) return;
+
+  // Group by ticker
+  const byTicker={};
+  parsed.forEach((t,i)=>{
+    if(!byTicker[t.ticker]) byTicker[t.ticker]={trades:[],totalPnl:0};
+    byTicker[t.ticker].trades.push({...t,_idx:i});
+    byTicker[t.ticker].totalPnl+=t.pnl;
+  });
+
+  const totalPnl=parsed.reduce((s,t)=>s+t.pnl,0);
+  const totalImported=parsed.filter(t=>t.imported).length;
+
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <span style="font-size:12px;color:var(--green)">✓ ${parsed.length} trade(s) · ${totalImported}/${parsed.length} geïmporteerd</span>
+    <span style="font-size:12px;color:var(--text3)">Dag totaal: <b style="color:${totalPnl>=0?'var(--green)':'var(--red)'}">${totalPnl>=0?'+':''}$${fmt(Math.abs(totalPnl),2)}</b></span>
+  </div>`;
+
+  Object.entries(byTicker).forEach(([ticker, group])=>{
+    const {trades, totalPnl:tickPnl}=group;
+    const allDone=trades.every(t=>t.imported);
+    const collapsed=false;
+    const groupId='bg_'+ticker;
+
+    html+=`<div style="margin-bottom:8px;border:.5px solid var(--border2);border-radius:var(--rsm);overflow:hidden">
+      <!-- Ticker header -->
+      <div onclick="toggleBrokerGroup('${groupId}')" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg2);cursor:pointer;user-select:none">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="${groupId}_chev" style="font-size:11px;color:var(--text3)">▼</span>
+          <span style="font-weight:700;color:var(--text)">${ticker}</span>
+          <span style="font-size:11px;color:var(--text3)">${trades.length} trade${trades.length!==1?'s':''}</span>
+          ${allDone?'<span style="font-size:10px;color:var(--green)">✓ alles geïmporteerd</span>':''}
+        </div>
+        <span style="font-weight:700;color:${tickPnl>=0?'var(--green)':'var(--red)'}">
+          ${tickPnl>=0?'+':''}$${fmt(Math.abs(tickPnl),2)}
+        </span>
+      </div>
+      <!-- Trades -->
+      <div id="${groupId}">
+        ${trades.map((t,li)=>{
+          const done=t.imported;
+          const i=t._idx;
+          const bg=done?'rgba(0,0,0,.15)':'var(--bg3)';
+          const op=done?'opacity:0.45;':'';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:${bg};border-top:.5px solid var(--border);${op}">
+            <div>
+              <div style="font-size:12px">
+                <span style="font-weight:600;color:var(--text2)">${t.dir}</span>
+                <span style="color:var(--text3);margin-left:4px">${fmtQty(t.qty)}× · ${fmtDate(t.date,true)} ${t.time}</span>
+                ${done?'<span style="font-size:10px;color:var(--green);margin-left:6px">✓</span>':''}
+              </div>
+              <div style="font-size:10px;color:var(--text3);margin-top:2px">
+                entry $${fmt(t.avgEntry,2)} → exit $${fmt(t.avgExit,2)} · ${t.partials} deelsluiting${t.partials!==1?'en':''}
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span style="font-weight:700;color:${t.pnl>=0?'var(--green)':'var(--red)'}">
+                ${t.pnl>=0?'+':''}$${fmt(Math.abs(t.pnl),2)}
+              </span>
+              ${done
+                ? `<button onclick="reEnableBrokerImport(${i})" title="Opnieuw importeren" style="font-size:10px;padding:3px 8px;background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:var(--rsm);cursor:pointer">↺</button>`
+                : `<button onclick="importBrokerTrade(${i})" style="font-size:11px;padding:5px 10px;background:var(--green);color:#fff;border:none;border-radius:var(--rsm);cursor:pointer;white-space:nowrap">Importeren →</button>`}
+              <button onclick="dismissBrokerRow(${i})" title="Verwijder" style="background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML=html;
+}
+
+function toggleBrokerGroup(id){
+  const el=document.getElementById(id);
+  const chev=document.getElementById(id+'_chev');
+  if(!el) return;
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'block';
+  if(chev) chev.textContent=open?'▶':'▼';
+}
+
 
 function importBrokerTrade(i){
   const t=(window._brokerParsed||[])[i]; if(!t) return;
@@ -2975,6 +3267,7 @@ function importBrokerTrade(i){
     if(!hist.find(h=>h.ticker===t.ticker&&h.date===t.date&&h.time===t.time)) hist.push(t);
     localStorage.setItem('tj4-broker-history',JSON.stringify(hist.slice(-100)));
   }catch(e){}
+  window._isImportedTrade=true;
   go('add');
   setTimeout(()=>{
     document.getElementById('f-date').value=t.date;
@@ -2984,11 +3277,30 @@ function importBrokerTrade(i){
     const risk=getRiskForDate(t.date);
     if(risk>0) document.getElementById('f-ru').value=String(Math.round(t.pnl/risk*100)/100).replace('.',',');
     setDir(t.dir);
-    document.getElementById('f-notes').value=`Import: ${t.qty}× ${t.ticker} ${t.dir}\nEntry: $${fmt(t.avgEntry,4)} → Exit: $${fmt(t.avgExit,4)} (${t.partials} deelsluitingen)`;
+    document.getElementById('f-notes').value=`Import: ${typeof fmtQty==='function'?fmtQty(t.qty):t.qty}× ${t.ticker} ${t.dir}\nEntry: $${fmt(t.avgEntry,4)} → Exit: $${fmt(t.avgExit,4)} (${t.partials} deelsluitingen)`;
     document.querySelector('.content').scrollTop=300;
     const card=document.getElementById('f-ticker').closest('.card');
     if(card){card.style.boxShadow='0 0 0 2px var(--green)';setTimeout(()=>card.style.boxShadow='',1500);}
+    // Mark as imported and refresh broker result list
+    if(window._brokerParsed&&window._brokerParsed[i]) window._brokerParsed[i].imported=true;
+    renderBrokerResult();
   },150);
+}
+
+function dismissBrokerRow(i){
+  if(window._brokerParsed&&window._brokerParsed[i]){
+    window._brokerParsed.splice(i,1);
+    renderBrokerResult();
+  }
+}
+
+// Re-import: mark isImported=false so the row becomes active again
+// Called from history popup or when a trade was deleted from log
+function reEnableBrokerImport(i){
+  if(window._brokerParsed&&window._brokerParsed[i]){
+    window._brokerParsed[i].imported=false;
+    renderBrokerResult();
+  }
 }
 
 function showBrokerHistory(){
@@ -3003,7 +3315,7 @@ function showBrokerHistory(){
         const i=hist.length-1-ri;
         return `<div onclick="importFromHistory(${i})" style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:.5px solid var(--border);cursor:pointer">
           <div><span style="font-weight:600;color:var(--text2)">${t.ticker}</span>
-            <span style="font-size:10px;color:var(--text3);margin-left:6px">${t.dir}·${t.qty}×·${fmtDate(t.date,true)} ${t.time}</span></div>
+            <span style="font-size:10px;color:var(--text3);margin-left:6px">${t.dir}·${typeof fmtQty==="function"?fmtQty(t.qty):t.qty}×·${fmtDate(t.date,true)} ${t.time}</span></div>
           <span style="font-size:12px;font-weight:700;color:${t.pnl>=0?'var(--green)':'var(--red)'}">${t.pnl>=0?'+':''}$${fmt(Math.abs(t.pnl),2)}</span>
         </div>`;
       }).join('')}`;
@@ -3021,6 +3333,7 @@ function importFromHistory(i){
 function clearForm(){
   ['f-ticker','f-pnl','f-ru','f-link','f-notes'].forEach(id=>{ const el=document.getElementById(id); el.value=''; el.className=''; });
   resetRules();
+  window._isImportedTrade=false;
   document.querySelectorAll('#emo-grid .eo').forEach(e=>e.classList.remove('sel'));
   starVal=0; litStars(0); setDir('Long');
   // Paper standaard UIT
@@ -3065,6 +3378,7 @@ async function saveTrade(){
     link: document.getElementById('f-link').value.trim(),
     notes: document.getElementById('f-notes').value.trim(),
     rules: getRulesArray(),
+    isImported: window._isImportedTrade||false,
     images: imgUrls, bt: {}
   };
   showSyncStatus('⏳ Opslaan...');
