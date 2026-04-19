@@ -2861,9 +2861,8 @@ function extractBtFromNotes(notes){
   m = notes.match(/Gemist:\s*([+-]?\$[\d.,]+)/);
   if(m){ bt.missedPnl = parseFloat(m[1].replace('$','').replace(/\./g,'').replace(',','.')); found=true; }
 
-  // missedRU: "(+16,78R)" after Gemist line
-  m = notes.match(/Gemist:.*?\(([+-]?[\d.,]+)R\)/);
-  if(m){ bt.missedRU = parseFloat(m[1].replace(',','.')); found=true; }
+  // missedRU: herbereken uit missedPnl en totalRisk (oude waarde kan fout zijn)
+  // wordt hieronder overschreven als beide beschikbaar zijn
 
   // plannedRR: "R:R gepland: 1:13,9"
   m = notes.match(/R:R gepland:\s*1:([\d.,]+)/);
@@ -2884,6 +2883,12 @@ function extractBtFromNotes(notes){
   // totalRisk: "risk $43,20"
   m = notes.match(/risk \$([\d.,]+)/);
   if(m){ bt.totalRisk = parseFloat(m[1].replace(/\./g,'').replace(',','.')); }
+
+  // Herbereken missedRU correct: missedPnl / totalRisk (niet per-share)
+  if(bt.missedPnl!=null && bt.totalRisk){
+    bt.missedRU = Math.round(bt.missedPnl / bt.totalRisk * 100) / 100;
+    found = true;
+  }
 
   return found ? bt : null;
 }
@@ -2995,23 +3000,13 @@ function renderGedragStats(all){
       </div>
     </div>
 
-    <!-- Worst early exits -->
-    ${worst.length?`<div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600">MEESTE WINST OP TAFEL GELATEN</div>
-      ${worst.map(t=>`
-        <div onclick="openTradeDetail(${trades.indexOf(t)})" style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:.5px solid var(--border);cursor:pointer">
-          <div>
-            <span style="font-weight:600;color:var(--text)">${t.ticker}</span>
-            <span style="font-size:11px;color:var(--text3);margin-left:6px">${t.dir} · ${fmtDate(t.date,true)}</span>
-            <div style="font-size:10px;color:var(--text3);margin-top:1px">
-              efficiency ${t.bt.efficiency}% · gepland R:R 1:${fmt(t.bt.plannedRR||0,1)}
-            </div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-weight:700;color:var(--red)">+$${fmt(t.bt.missedPnl,2)} gemist</div>
-            <div style="font-size:10px;color:var(--text3)">+${fmt(t.bt.missedRU,2)}R op tafel</div>
-          </div>
-        </div>`).join('')}
+    <!-- Worst early exits → popup knop -->
+    ${worst.length?`<div style="margin-top:4px">
+      <button onclick="openEfficiencyPopup('Meeste winst op tafel gelaten','var(--red)',[${worst.map(t=>trades.indexOf(t)).join(',')}])"
+        style="width:100%;text-align:left;padding:10px 12px;background:rgba(244,63,94,.06);border:.5px solid rgba(244,63,94,.2);border-radius:var(--rsm);cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:var(--text2);font-weight:600">🔍 Bekijk ${worst.length} trade${worst.length!==1?'s':''} met meeste winst op tafel</span>
+        <span style="font-size:11px;color:var(--red)">+$${fmt(worst.reduce((s,t)=>s+(t.bt.missedPnl||0),0),2)} gemist →</span>
+      </button>
     </div>`:''}
   `;
 }
@@ -3526,8 +3521,8 @@ function parseOrderHistory(text){
           ? Math.round((activeTP-avgEntry)*matchQty*100)/100
           : Math.round((avgEntry-activeTP)*matchQty*100)/100;
         missedPnl  = Math.round((tpPnl-calcPnl)*100)/100;
-        const riskPs = totalRisk/matchQty;
-        missedRU   = riskPs ? Math.round(missedPnl/riskPs*100)/100 : null;
+        // missedRU: gebruik totalRisk als 1R (niet per-share)
+        missedRU   = totalRisk ? Math.round(missedPnl/totalRisk*100)/100 : null;
         plannedRR  = riskPerShare ? Math.round(Math.abs(avgEntry-activeTP)/riskPerShare*100)/100 : null;
         efficiency = tpPnl!==0 ? Math.round(calcPnl/tpPnl*100) : null;
       }
