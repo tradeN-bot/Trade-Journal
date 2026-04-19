@@ -3212,8 +3212,9 @@ function parseOrderHistory(text){
     const isoDate = dp[0].length===4
       ? `${dp[0]}-${dp[1].padStart(2,'0')}-${dp[2].padStart(2,'0')}`
       : `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
-    const timePart = dtRaw.includes(' ') ? dtRaw.split(' ')[1].slice(0,5) : '';
-    const isoFull  = isoDate + ' ' + timePart;
+    const timeRaw  = dtRaw.includes(' ') ? dtRaw.split(' ')[1] : '';
+    const timePart = timeRaw.slice(0,5); // HH:MM for display
+    const isoFull  = isoDate + ' ' + timeRaw; // full HH:MM:SS for sorting
     // Exchange: last non-empty column
     const exchange = c.slice(9).map(v=>v.trim()).filter(Boolean).pop() || '';
 
@@ -3241,64 +3242,113 @@ function parseOrderHistory(text){
     // Sort chronologically
     const sorted = tickerRows.slice().sort((a,b)=>a.dt.localeCompare(b.dt));
 
-    // Find buy entries (Filled Market buys)
-    const buyFilled = sorted.filter(r=>r.side==='buy'&&r.status==='Filled'&&r.qty>0&&r.price>0);
-    if(!buyFilled.length) return;
-
-    // Find sell executions (Filled Market sells)
-    const sellFilled = sorted.filter(r=>r.side==='sell'&&r.status==='Filled'&&r.qty>0&&r.price>0);
-    if(!sellFilled.length) return;
-
-    // Entry: first buy Filled
-    const entryRow = buyFilled[0];
-    const entryQty = buyFilled.reduce((s,r)=>s+r.qty, 0);
-    const avgEntry = buyFilled.reduce((s,r)=>s+r.price*r.qty, 0) / entryQty;
-
-    // Exchange from first filled row
-    const exchange = (buyFilled[0].exchange || sellFilled[0]?.exchange || '').trim();
-
-    // Fees: entry legs + exit legs
-    const entryFees = buyFilled.reduce((s,r)=>s+calcExecFee(r.qty, r.exchange||exchange), 0);
-    const exitFees  = sellFilled.reduce((s,r)=>s+calcExecFee(r.qty, r.exchange||exchange), 0);
-    const totalFees = Math.round((entryFees + exitFees) * 100) / 100;
-
-    // Exit: all sell Filled
-    const exitQty  = sellFilled.reduce((s,r)=>s+r.qty, 0);
-    const avgExit  = sellFilled.reduce((s,r)=>s+r.price*r.qty, 0) / exitQty;
-    const matchQty = Math.min(entryQty, exitQty);
-    const grossPnl = Math.round((avgExit - avgEntry) * matchQty * 100) / 100;
-    const calcPnl  = Math.round((grossPnl - totalFees) * 100) / 100;
-
-    // Initial SL: earliest Stop loss / Tr. stop loss row (Created or first Modified)
-    const slRows = sorted.filter(r=>
-      r.side==='sell' &&
-      /stop loss|tr\. stop loss|trailing stop/i.test(r.type) &&
-      (r.stopPrice>0 || r.price>0)
-    );
-    const initialSL = slRows.length > 0 ? (slRows[0].stopPrice || slRows[0].price) : null;
-    const riskPerShare = initialSL ? Math.abs(avgEntry - initialSL) : null;
-    const totalRisk    = riskPerShare ? Math.round(riskPerShare * matchQty * 100) / 100 : null;
-
-    // Closes detail for notes (gross per leg, fees shown separately)
-    const closes = sellFilled.map(r=>{
-      const fee = calcExecFee(r.qty, r.exchange||exchange);
-      const gross = Math.round((r.price - avgEntry) * r.qty * 100) / 100;
-      return {qty:r.qty, price:r.price, net: Math.round((gross - fee)*100)/100, fee};
+    // Only actual executions — Filled and Partially filled rows
+    const execs = sorted.filter(r=>{
+      const s = (r.status||'').trim().toLowerCase();
+      return (s==='filled'||s==='partially filled') && r.qty>0 && r.price>0;
     });
+    if(!execs.length) return;
 
-    result.push({
-      ticker, date: entryRow.date, time: entryRow.time,
-      dir: 'Long', qty: matchQty,
-      avgEntry: Math.round(avgEntry*10000)/10000,
-      avgExit:  Math.round(avgExit*10000)/10000,
-      pnl: calcPnl, grossPnl, totalFees, exchange,
-      partials: sellFilled.length,
-      initialSL, riskPerShare, totalRisk,
-      slMoves: slRows.length,
-      _closes: closes,
-      imported: false,
-      _uid: ticker+'_'+entryRow.date+'_'+entryRow.time+'_'+Math.round(Math.random()*1e9)
+    const exchange = (execs.find(r=>r.exchange)||{}).exchange || '';
+
+    // Fee helper (defined per ticker scope)
+    function feesForLegs(legs){
+      const byOrder = {};
+      legs.forEach(r=>{
+        const id = r.orderID || (r.dt+'_'+r.side);
+        if(!byOrder[id]) byOrder[id]={qty:0, exchange:r.exchange||exchange};
+        byOrder[id].qty += r.qty;
+      });
+      return Object.values(byOrder).reduce((s,o)=>s+calcExecFee(o.qty,o.exchange),0);
+    }
+
+    // Track position chronologically — split into separate trades when pos hits 0
+    let position = 0;
+    let currentRows = [];  // all exec rows of current open trade
+    let currentDir  = '';
+
+    const flushTrade = () => {
+      if(!currentRows.length) return;
+      const opens  = currentDir==='Long'
+        ? currentRows.filter(r=>r.side==='buy')
+        : currentRows.filter(r=>r.side==='sell');
+      const closes = currentDir==='Long'
+        ? currentRows.filter(r=>r.side==='sell')
+        : currentRows.filter(r=>r.side==='buy');
+      if(!opens.length||!closes.length){ currentRows=[]; return; }
+
+      const entryQty = opens.reduce((s,r)=>s+r.qty,0);
+      const exitQty  = closes.reduce((s,r)=>s+r.qty,0);
+      const matchQty = Math.min(entryQty,exitQty);
+      const avgEntry = opens.reduce((s,r)=>s+r.price*r.qty,0)/entryQty;
+      const avgExit  = closes.reduce((s,r)=>s+r.price*r.qty,0)/exitQty;
+
+      const entryFees = feesForLegs(opens);
+      const exitFees  = feesForLegs(closes);
+      const totalFees = Math.round((entryFees+exitFees)*100)/100;
+
+      const grossPnl = currentDir==='Long'
+        ? Math.round((avgExit-avgEntry)*matchQty*100)/100
+        : Math.round((avgEntry-avgExit)*matchQty*100)/100;
+      const calcPnl = Math.round((grossPnl-totalFees)*100)/100;
+
+      // SL: look in all sorted rows for this ticker for stop loss orders
+      // relevant to the time window of this trade
+      const tradeStart = opens[0].dt;
+      const tradeEnd   = closes[closes.length-1].dt;
+      const slRows = sorted.filter(r=>
+        /stop loss|tr\. stop loss|trailing stop/i.test(r.type) &&
+        r.dt >= tradeStart && r.dt <= tradeEnd &&
+        (r.stopPrice>0||r.price>0)
+      );
+      const initialSL    = slRows.length ? (slRows[0].stopPrice||slRows[0].price) : null;
+      const riskPerShare = initialSL ? Math.abs(avgEntry-initialSL) : null;
+      const totalRisk    = riskPerShare ? Math.round(riskPerShare*matchQty*100)/100 : null;
+
+      const closesDetail = closes.map(r=>{
+        const fee   = calcExecFee(r.qty, r.exchange||exchange);
+        const gross = currentDir==='Long'
+          ? Math.round((r.price-avgEntry)*r.qty*100)/100
+          : Math.round((avgEntry-r.price)*r.qty*100)/100;
+        return {qty:r.qty, price:r.price, net:Math.round((gross-fee)*100)/100, fee};
+      });
+
+      result.push({
+        ticker, date:opens[0].date, time:opens[0].time,
+        dir:currentDir, qty:matchQty,
+        avgEntry:Math.round(avgEntry*10000)/10000,
+        avgExit :Math.round(avgExit*10000)/10000,
+        pnl:calcPnl, grossPnl, totalFees, exchange,
+        partials:closes.length,
+        initialSL, riskPerShare, totalRisk,
+        slMoves:slRows.length,
+        _closes:closesDetail,
+        imported:false,
+        _uid:ticker+'_'+opens[0].date+'_'+opens[0].time+'_'+Math.round(Math.random()*1e9)
+      });
+      currentRows=[];
+    };
+
+    execs.forEach(r=>{
+      if(position===0){
+        // Starting a new trade
+        currentRows = [r];
+        currentDir  = r.side==='buy' ? 'Long' : 'Short';
+        position    = Math.round((r.side==='buy' ? r.qty : -r.qty)*1e6)/1e6;
+      } else {
+        currentRows.push(r);
+        position += r.side==='buy' ? r.qty : -r.qty;
+        position  = Math.round(position*1e6)/1e6;
+        if(Math.abs(position)<0.0001){
+          flushTrade();  // resets currentRows=[] inside
+          position   = 0;
+          currentDir = '';
+          // currentRows is now [] — next forEach iteration starts fresh trade
+        }
+      }
     });
+    // Flush any remaining partial trade
+    if(currentRows.length) flushTrade();
   });
 
   if(!result.length) throw new Error('Geen volledige trades gevonden (koop + verkoop uitvoeringen nodig).');
@@ -3417,20 +3467,18 @@ function parseBrokerData(text){
       if(r.isOpen){
         // Opening or scaling into a position
         if(position===0){
-          // Start fresh trade
           currentRows=[];
           currentDir=r.action==='buy'?'Long':'Short';
         }
         currentRows.push(r);
+        // Long opens with buys (pos+), Short opens with sells (pos-)
         position=Math.round((position+(r.action==='buy'?r.qty:-r.qty))*1e6)/1e6;
       } else {
         // Closing row
-        if(!currentRows.length){
-          // No open position → carry-over from previous day, skip
-          return;
-        }
+        if(!currentRows.length) return; // carry-over, skip
         currentRows.push(r);
-        position=Math.round((position-(r.action==='sell'?r.qty:-r.qty))*1e6)/1e6;
+        // Long closes with sells (pos-), Short closes with buys (pos+)
+        position=Math.round((position+(r.action==='buy'?r.qty:-r.qty))*1e6)/1e6;
         if(Math.abs(position)<0.0002){
           flushTrade();
           position=0;
@@ -3549,6 +3597,60 @@ function toggleBrokerGroup(id){
 }
 
 
+function lockImportFields(){
+  // Readonly: date, time, ticker (identifying fields — should not change)
+  const readonlyFields = ['f-date','f-time','f-ticker'];
+  readonlyFields.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.readOnly = true;
+    el.style.opacity = '0.45';
+    el.style.cursor  = 'not-allowed';
+  });
+  // Visual dim only (still editable): direction buttons, pnl, ru, pnl-sign-btn
+  const dimFields = ['f-pnl','f-ru'];
+  dimFields.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.style.opacity = '0.55';
+    el.dataset.importDimmed = '1';
+  });
+  ['btn-long','btn-short'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.style.opacity = '0.55';
+    el.dataset.importDimmed = '1';
+  });
+  const signBtn = document.getElementById('pnl-sign-btn');
+  if(signBtn){ signBtn.style.opacity='0.55'; signBtn.dataset.importDimmed='1'; }
+  // Show badge
+  const ct = document.querySelector('#sec-add .card .ct');
+  if(ct && !document.getElementById('import-lock-badge')){
+    const badge = document.createElement('span');
+    badge.id = 'import-lock-badge';
+    badge.innerHTML = ' <span style="font-size:10px;background:var(--import-bg);color:var(--import);border-radius:4px;padding:2px 7px;font-weight:600;vertical-align:middle">⬇ Import — vul strategie, beoordeling & emotie in</span>';
+    ct.appendChild(badge);
+  }
+}
+
+function unlockImportFields(){
+  const readonlyFields = ['f-date','f-time','f-ticker'];
+  readonlyFields.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.readOnly = false;
+    el.style.opacity = '';
+    el.style.cursor  = '';
+  });
+  // Remove dim from all dimmed elements
+  document.querySelectorAll('[data-import-dimmed="1"]').forEach(el=>{
+    el.style.opacity = '';
+    delete el.dataset.importDimmed;
+  });
+  const badge = document.getElementById('import-lock-badge');
+  if(badge) badge.remove();
+}
+
 function importBrokerTrade(uid){
   const t=(window._brokerParsed||[]).find(t=>t._uid===uid); if(!t) return;
   try{
@@ -3588,6 +3690,7 @@ function importBrokerTrade(uid){
       partialLines || `  Exit: $${fmt(t.avgExit,2)}`
     ].join('\n');
     document.getElementById('f-notes').value=notesText;
+    lockImportFields();
     document.querySelector('.content').scrollTop=300;
     const card=document.getElementById('f-ticker').closest('.card');
     if(card){card.style.boxShadow='0 0 0 2px var(--green)';setTimeout(()=>card.style.boxShadow='',1500);}
@@ -3639,6 +3742,7 @@ function clearForm(){
   ['f-ticker','f-pnl','f-ru','f-link','f-notes'].forEach(id=>{ const el=document.getElementById(id); el.value=''; el.className=''; });
   resetRules();
   window._isImportedTrade=false;
+  unlockImportFields();
   document.querySelectorAll('#emo-grid .eo').forEach(e=>e.classList.remove('sel'));
   starVal=0; litStars(0); setDir('Long');
   // Paper standaard UIT
