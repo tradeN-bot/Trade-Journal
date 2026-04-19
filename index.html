@@ -364,10 +364,19 @@ input[type=range]{accent-color:var(--green);width:100%}
           <span id="broker-chevron" style="font-size:12px;color:var(--text3);transition:transform .25s">▼</span>
         </div>
         <div id="broker-panel" style="display:none;margin-top:10px">
-          <div style="background:rgba(59,130,246,.08);border:.5px solid rgba(59,130,246,.25);border-radius:var(--rsm);padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--text3);line-height:1.7">
-            <b style="color:var(--blue)">Twee formaten worden herkend:</b><br>
-            <b>1. Volledig overzicht</b> — kolom 1: Ticker · 2: Buy/Sell · 3: Status (Filled) · 6: Prijs · 7: Aantal · 8: Datum+tijd<br>
-            <b>2. Filled orders</b> — kolom 1: Ticker · 2: Buy/Sell · 3: Aantal · 4: Prijs · 5: P&L · 7: Datum+tijd (geen Status kolom)<br>
+          <!-- Format toggle -->
+          <div style="display:flex;gap:6px;margin-bottom:10px">
+            <button type="button" id="fmt-filled-btn" onclick="setBrokerFormat('filled')"
+              style="flex:1;padding:8px;border-radius:var(--rsm);border:.5px solid var(--green);background:rgba(16,185,129,.15);color:var(--green);cursor:pointer;font-size:12px;font-weight:600">
+              📋 Filled orders
+            </button>
+            <button type="button" id="fmt-history-btn" onclick="setBrokerFormat('history')"
+              style="flex:1;padding:8px;border-radius:var(--rsm);border:.5px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;font-size:12px;font-weight:600">
+              📜 Order history
+            </button>
+          </div>
+          <div id="broker-format-info" style="background:rgba(59,130,246,.08);border:.5px solid rgba(59,130,246,.25);border-radius:var(--rsm);padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--text3);line-height:1.7">
+            <b style="color:var(--blue)">Filled orders:</b> netto P&L per rij — parser herkent automatisch kolommen.<br>
             Meerdere trades en tickers tegelijk uploaden is mogelijk.
             <span style="color:var(--green);cursor:pointer;margin-left:8px" onclick="showBrokerHistory()">▶ Eerder geïmporteerd →</span>
           </div>
@@ -2955,7 +2964,7 @@ function parseBrokerFile(input){
   const file=input.files[0]; if(!file) return;
   document.getElementById('broker-file-name').textContent=file.name;
   const r=new FileReader();
-  r.onload=e=>{ try{ showBrokerResult(parseBrokerData(e.target.result)); } catch(err){ showBrokerError(err.message); } input.value=''; };
+  r.onload=e=>{ try{ showBrokerResult(parseByFormat(e.target.result)); } catch(err){ showBrokerError(err.message); } input.value=''; };
   r.readAsText(file);
 }
 
@@ -2963,8 +2972,12 @@ function debounceBrokerParse(text){
   clearTimeout(debounceBrokerParse._t);
   debounceBrokerParse._t=setTimeout(()=>{
     if(!text.trim()) return;
-    try{ showBrokerResult(parseBrokerData(text)); } catch(err){ showBrokerError(err.message); }
+    try{ showBrokerResult(parseByFormat(text)); } catch(err){ showBrokerError(err.message); }
   }, 500);
+}
+
+function parseByFormat(text){
+  return brokerFormat === 'history' ? parseOrderHistory(text) : parseBrokerData(text);
 }
 
 function showBrokerError(msg){
@@ -3138,6 +3151,159 @@ function detectBrokerFormat(rows){
   return map;
 }
 
+
+// ── Broker format state ───────────────────────────────────────────────────────
+let brokerFormat = 'filled'; // 'filled' | 'history'
+
+function setBrokerFormat(fmt){
+  brokerFormat = fmt;
+  const filledBtn  = document.getElementById('fmt-filled-btn');
+  const historyBtn = document.getElementById('fmt-history-btn');
+  const infoEl     = document.getElementById('broker-format-info');
+  if(filledBtn){
+    filledBtn.style.border  = fmt==='filled' ? '.5px solid var(--green)' : '.5px solid var(--border2)';
+    filledBtn.style.background = fmt==='filled' ? 'rgba(16,185,129,.15)' : 'transparent';
+    filledBtn.style.color   = fmt==='filled' ? 'var(--green)' : 'var(--text3)';
+    historyBtn.style.border = fmt==='history' ? '.5px solid var(--blue)' : '.5px solid var(--border2)';
+    historyBtn.style.background = fmt==='history' ? 'rgba(59,130,246,.15)' : 'transparent';
+    historyBtn.style.color  = fmt==='history' ? 'var(--blue)' : 'var(--text3)';
+  }
+  if(infoEl){
+    infoEl.innerHTML = fmt==='filled'
+      ? '<b style="color:var(--blue)">Filled orders:</b> netto P&L per rij — parser herkent automatisch kolommen.<br>Meerdere trades en tickers tegelijk uploaden is mogelijk.<span style="color:var(--green);cursor:pointer;margin-left:8px" onclick="showBrokerHistory()">▶ Eerder geïmporteerd →</span>'
+      : '<b style="color:var(--blue)">Order history:</b> volledig orderlogboek met Created/Modified/Filled/Cancelled.<br>Parser filtert alleen <b>Filled</b> uitvoeringen en haalt de <b>initiële stoploss</b> automatisch op uit de SL-orders.<span style="color:var(--green);cursor:pointer;margin-left:8px" onclick="showBrokerHistory()">▶ Eerder geïmporteerd →</span>';
+  }
+  // Clear current results
+  const res = document.getElementById('broker-parse-result');
+  if(res) res.innerHTML = '';
+  window._brokerParsed = [];
+}
+
+// ── Order history parser ───────────────────────────────────────────────────────
+function parseOrderHistory(text){
+  const lines = text.trim().split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) throw new Error('Geen data gevonden.');
+
+  // Skip header if present
+  const firstCols = lines[0].split('\t');
+  const isHeader = /symbol|ticker|side|event|status/i.test(firstCols[0]+firstCols[1]+firstCols[2]);
+  const dataLines = isHeader ? lines.slice(1) : lines;
+
+  // Parse all rows
+  // Cols: Ticker|Side|Status|OrderID|Type|Price|Qty|DateTime|StopPrice|SymbType|Value|...
+  const rows = dataLines.map(line=>{
+    const c = line.split('\t');
+    const ticker    = (c[0]||'').trim().toUpperCase();
+    const side      = (c[1]||'').trim().toLowerCase();   // buy/sell
+    const status    = (c[2]||'').trim();                 // Filled/Cancelled/Modified/Created
+    const orderID   = (c[3]||'').trim();
+    const type      = (c[4]||'').trim();                 // Market/Stop loss/Take profit/Tr. stop loss
+    const price     = parseNum(c[5]||'');
+    const qty       = parseQty(c[6]||'');
+    const dtRaw     = (c[7]||'').trim();
+    const stopPrice = parseNum(c[8]||'');
+
+    if(!ticker||!/^[A-Z]{1,8}$/.test(ticker)) return null;
+    if(!dtRaw) return null;
+
+    // Parse date → ISO
+    const dp = dtRaw.split(' ')[0].split('-');
+    if(dp.length!==3) return null;
+    const isoDate = dp[0].length===4
+      ? `${dp[0]}-${dp[1].padStart(2,'0')}-${dp[2].padStart(2,'0')}`
+      : `${dp[2]}-${dp[1].padStart(2,'0')}-${dp[0].padStart(2,'0')}`;
+    const timePart = dtRaw.includes(' ') ? dtRaw.split(' ')[1].slice(0,5) : '';
+    const isoFull  = isoDate + ' ' + timePart;
+    // Exchange: last non-empty column
+    const exchange = c.slice(9).map(v=>v.trim()).filter(Boolean).pop() || '';
+
+    return {ticker, side, status, orderID, type, price, qty, stopPrice,
+            date: isoDate, time: timePart, dt: isoFull, exchange};
+  }).filter(Boolean);
+
+  if(!rows.length) throw new Error('Geen geldige rijen gevonden.');
+
+  // Fee helper: only for equity exchanges (NASDAQ/NYSE/AMEX/ARCA/BATS)
+  // Rule: max(qty × $0.007, $1.50) per execution leg
+  const EQUITY_EXCHANGES = /^(NASDAQ|NYSE|AMEX|ARCA|BATS)$/i;
+  function calcExecFee(qty, exchange){
+    if(!EQUITY_EXCHANGES.test((exchange||'').trim())) return 0;
+    return Math.max(qty * 0.007, 1.50);
+  }
+
+  // Group by ticker
+  const byTicker = {};
+  rows.forEach(r=>{ if(!byTicker[r.ticker]) byTicker[r.ticker]=[]; byTicker[r.ticker].push(r); });
+
+  const result = [];
+
+  Object.entries(byTicker).forEach(([ticker, tickerRows])=>{
+    // Sort chronologically
+    const sorted = tickerRows.slice().sort((a,b)=>a.dt.localeCompare(b.dt));
+
+    // Find buy entries (Filled Market buys)
+    const buyFilled = sorted.filter(r=>r.side==='buy'&&r.status==='Filled'&&r.qty>0&&r.price>0);
+    if(!buyFilled.length) return;
+
+    // Find sell executions (Filled Market sells)
+    const sellFilled = sorted.filter(r=>r.side==='sell'&&r.status==='Filled'&&r.qty>0&&r.price>0);
+    if(!sellFilled.length) return;
+
+    // Entry: first buy Filled
+    const entryRow = buyFilled[0];
+    const entryQty = buyFilled.reduce((s,r)=>s+r.qty, 0);
+    const avgEntry = buyFilled.reduce((s,r)=>s+r.price*r.qty, 0) / entryQty;
+
+    // Exchange from first filled row
+    const exchange = (buyFilled[0].exchange || sellFilled[0]?.exchange || '').trim();
+
+    // Fees: entry legs + exit legs
+    const entryFees = buyFilled.reduce((s,r)=>s+calcExecFee(r.qty, r.exchange||exchange), 0);
+    const exitFees  = sellFilled.reduce((s,r)=>s+calcExecFee(r.qty, r.exchange||exchange), 0);
+    const totalFees = Math.round((entryFees + exitFees) * 100) / 100;
+
+    // Exit: all sell Filled
+    const exitQty  = sellFilled.reduce((s,r)=>s+r.qty, 0);
+    const avgExit  = sellFilled.reduce((s,r)=>s+r.price*r.qty, 0) / exitQty;
+    const matchQty = Math.min(entryQty, exitQty);
+    const grossPnl = Math.round((avgExit - avgEntry) * matchQty * 100) / 100;
+    const calcPnl  = Math.round((grossPnl - totalFees) * 100) / 100;
+
+    // Initial SL: earliest Stop loss / Tr. stop loss row (Created or first Modified)
+    const slRows = sorted.filter(r=>
+      r.side==='sell' &&
+      /stop loss|tr\. stop loss|trailing stop/i.test(r.type) &&
+      (r.stopPrice>0 || r.price>0)
+    );
+    const initialSL = slRows.length > 0 ? (slRows[0].stopPrice || slRows[0].price) : null;
+    const riskPerShare = initialSL ? Math.abs(avgEntry - initialSL) : null;
+    const totalRisk    = riskPerShare ? Math.round(riskPerShare * matchQty * 100) / 100 : null;
+
+    // Closes detail for notes (gross per leg, fees shown separately)
+    const closes = sellFilled.map(r=>{
+      const fee = calcExecFee(r.qty, r.exchange||exchange);
+      const gross = Math.round((r.price - avgEntry) * r.qty * 100) / 100;
+      return {qty:r.qty, price:r.price, net: Math.round((gross - fee)*100)/100, fee};
+    });
+
+    result.push({
+      ticker, date: entryRow.date, time: entryRow.time,
+      dir: 'Long', qty: matchQty,
+      avgEntry: Math.round(avgEntry*10000)/10000,
+      avgExit:  Math.round(avgExit*10000)/10000,
+      pnl: calcPnl, grossPnl, totalFees, exchange,
+      partials: sellFilled.length,
+      initialSL, riskPerShare, totalRisk,
+      slMoves: slRows.length,
+      _closes: closes,
+      imported: false,
+      _uid: ticker+'_'+entryRow.date+'_'+entryRow.time+'_'+Math.round(Math.random()*1e9)
+    });
+  });
+
+  if(!result.length) throw new Error('Geen volledige trades gevonden (koop + verkoop uitvoeringen nodig).');
+  return result.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+}
 
 function parseBrokerData(text){
   const lines=text.trim().split('\n').map(l=>l.trim()).filter(Boolean);
@@ -3351,6 +3517,8 @@ function renderBrokerResult(){
               </div>
               <div style="font-size:10px;color:var(--text3);margin-top:2px">
                 entry $${fmt(t.avgEntry,2)} → exit $${fmt(t.avgExit,2)} · ${t.partials} deelsluiting${t.partials!==1?'en':''}
+                ${t.initialSL ? `<span style="color:var(--amber);margin-left:8px">SL $${fmt(t.initialSL,2)} · risk $${fmt(t.totalRisk,2)} · ${t.slMoves} SL aanpassingen</span>` : ''}
+                ${t.totalFees ? `<span style="color:var(--text3);margin-left:8px">fees -$${fmt(t.totalFees,2)} · bruto $${fmt(t.grossPnl,2)}</span>` : ''}
               </div>
             </div>
             <div style="display:flex;gap:6px;align-items:center">
@@ -3395,7 +3563,8 @@ function importBrokerTrade(uid){
     document.getElementById('f-time').value=t.time;
     document.getElementById('f-ticker').value=t.ticker;
     document.getElementById('f-pnl').value=String(t.pnl).replace('.',',');
-    const risk=getRiskForDate(t.date);
+    // Use totalRisk from order history as 1R if available, else fall back to settings
+    const risk = t.totalRisk > 0 ? t.totalRisk : getRiskForDate(t.date);
     if(risk>0) document.getElementById('f-ru').value=String(Math.round(t.pnl/risk*100)/100).replace('.',',');
     setDir(t.dir);
     // Build detailed notes with each partial close listed separately
@@ -3404,10 +3573,17 @@ function importBrokerTrade(uid){
       const priceStr = '$'+fmt(c.price,2);
       return `  ${i+1}. ${fmtQty(c.qty)}× @ ${priceStr}  →  ${pnlStr}`;
     }).join('\n');
+    const slLine = t.initialSL
+      ? [`SL:     $${fmt(t.initialSL,2)} (risk $${fmt(t.totalRisk,2)} · ${t.slMoves} aanpassingen)`, ``]
+      : [];
+    const feeLine = t.totalFees
+      ? [`Fees:   -$${fmt(t.totalFees,2)} (bruto $${fmt(t.grossPnl,2)})`]
+      : [];
     const notesText = [
       `Import: ${fmtQty(t.qty)}× ${t.ticker} ${t.dir}`,
       `Entry:  $${fmt(t.avgEntry,2)}`,
-      ``,
+      ...slLine,
+      ...feeLine,
       `Deelsluitingen (${t.partials}):`,
       partialLines || `  Exit: $${fmt(t.avgExit,2)}`
     ].join('\n');
