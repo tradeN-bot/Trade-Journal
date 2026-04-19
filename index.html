@@ -617,7 +617,7 @@ input[type=range]{accent-color:var(--green);width:100%}
       <!-- Actieplan naleving -->
       <div class="card">
         <div class="ct">Actieplan naleving</div>
-        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Regels 1-3: op basis van jouw invoer per trade. Regel 4: automatisch berekend uit dagelijks RU-totaal. Klik op een regel voor details.</p>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Handmatige regels: op basis van jouw invoer per trade. ⚡ Daglimiet: automatisch berekend uit dagelijks RU-totaal. Klik op een regel voor details.</p>
         <div id="actieplan-stats"></div>
       </div>
     </div>
@@ -1842,6 +1842,35 @@ function makeBtBtn(t, idx){
   </div>`;
 }
 
+function makeActieplanBtn(t, idx){
+  const rules = t.rules||[];
+  const filled = rules.some(v=>v===1||v===-1);
+  if(!filled){
+    return `<button class="icon-btn" title="Actieplan niet ingevuld — klik om te bewerken" onclick="openEdit(${idx})" style="color:var(--text3);opacity:.35">✔</button>`;
+  }
+  const rows = RULES.map((r,i)=>{
+    const v = rules[i]||0;
+    const icon  = v===1?'✓':v===-1?'✗':'·';
+    const color = v===1?'var(--green)':v===-1?'var(--red)':'var(--text3)';
+    return `<div style="display:flex;align-items:flex-start;gap:7px;font-size:11px;padding:3px 0;border-bottom:.5px solid var(--border)">
+      <span style="font-weight:700;color:${color};width:12px;flex-shrink:0;margin-top:1px">${icon}</span>
+      <span style="color:var(--text2);line-height:1.35"><b style="color:${color}">${r.label}</b> <span style="color:var(--text3)">— ${r.desc}</span></span>
+    </div>`;
+  }).join('');
+  const allGood = RULES.every((_,i)=>(rules[i]||0)===1);
+  const anyBad  = RULES.some((_,i)=>(rules[i]||0)===-1);
+  const dotColor = allGood?'var(--green)':anyBad?'var(--red)':'var(--amber)';
+  const badge    = anyBad?'✗':'✓';
+  return `<div style="position:relative;display:inline-block" onmouseenter="this.querySelector('.notes-popup').style.display='block'" onmouseleave="this.querySelector('.notes-popup').style.display='none'">
+    <button class="icon-btn" onclick="openEdit(${idx})" style="color:${dotColor}">✔</button>
+    <span style="position:absolute;top:-3px;right:-3px;background:${dotColor};color:#fff;border-radius:50%;width:10px;height:10px;font-size:8px;display:flex;align-items:center;justify-content:center;pointer-events:none;line-height:1">${badge}</span>
+    <div class="notes-popup" style="display:none;min-width:220px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Actieplan</div>
+      ${rows}
+    </div>
+  </div>`;
+}
+
 // ============================================================
 //  LOG RENDER
 // ============================================================
@@ -1907,6 +1936,7 @@ function renderLog(){
           ${makeNotesBtn(t)}
           <button class="icon-btn" title="Bewerken" onclick="openEdit(${idx})">✏</button>
           <button class="icon-btn" title="Kopiëren" onclick="copyTrade(${idx})">⧉</button>
+          ${makeActieplanBtn(t,idx)}
           ${makeBtBtn(t,idx)}
           <button class="icon-btn" title="Verwijderen" onclick="delTrade(${idx})" style="color:var(--red)">×</button>
         </div>
@@ -2672,7 +2702,7 @@ document.addEventListener('touchend', e=>{
 //  SAVE / EDIT / DELETE
 // ============================================================
 // ============================================================
-//  ACTIEPLAN — regels 1-3 handmatig, regel 4 automatisch
+//  ACTIEPLAN — handmatige regels + automatische daglimiet
 // ============================================================
 const RULES = [
   {id:'rule1', label:'Regel 1', desc:'Positiegrootte berekend v\u00f3\u00f3r entry'},
@@ -2810,7 +2840,7 @@ function renderActieplanStats(all){
       </div></div>`;
   }).join('<div style="height:.5px;background:var(--border);margin:4px 0 12px"></div>');
 
-  // Regel 4: automatisch uit dagelijks RU
+  // Daglimiet: automatisch berekend uit dagelijks RU
   const dayRU={}, dayPnl={};
   all.forEach(t=>{ dayRU[t.date]=(dayRU[t.date]||0)+(+t.ru||0); dayPnl[t.date]=(dayPnl[t.date]||0)+(+t.pnl||0); });
   const dayEntries=Object.entries(dayRU).sort((a,b)=>a[0].localeCompare(b[0]));
@@ -2822,7 +2852,7 @@ function renderActieplanStats(all){
   html += `<div style="height:.5px;background:var(--border);margin:4px 0 12px"></div>
     <div style="margin-bottom:6px;cursor:pointer" onclick="openRule4Popup()" title="Klik voor details">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-        <span style="font-size:12px;font-weight:600;color:var(--text2)">Regel 4 — Daglimiet -3R ↗ <span style="font-size:10px;color:var(--amber);font-weight:400">(automatisch)</span></span>
+        <span style="font-size:12px;font-weight:600;color:var(--text2)">⚡ Daglimiet -3R ↗ <span style="font-size:10px;color:var(--amber);font-weight:400">(automatisch berekend)</span></span>
         <span style="font-size:10px;color:var(--text3)">${tot} handelsdagen</span>
       </div>
       <div style="display:flex;height:16px;border-radius:4px;overflow:hidden;gap:1px;margin-bottom:4px">
@@ -2883,7 +2913,7 @@ function openRule4Popup(){
   const ok=entries.filter(([,ru])=>ru>=-3);
 
   document.getElementById('chart-popup-filters').style.display='none';
-  document.getElementById('chart-popup-title').innerHTML=`Regel 4 — Daglimiet -3R <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+  document.getElementById('chart-popup-title').innerHTML=`⚡ Daglimiet -3R (automatisch) <button class="modal-close" onclick="closeChartPopup()">×</button>`;
   document.querySelector('#chart-popup .cw').innerHTML=`
     <div style="background:rgba(59,130,246,.08);border:.5px solid rgba(59,130,246,.25);border-radius:var(--rsm);padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.6">
       Daglimiet = <b>-3R per dag</b>. Bereikt? Platform dicht.<br>
