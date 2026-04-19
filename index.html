@@ -506,6 +506,34 @@ input[type=range]{accent-color:var(--green);width:100%}
       </div>
 
       <div class="mgrid" id="dash-kpis"></div>
+      <div id="dash-trades-card" style="display:none;margin-bottom:10px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div class="card" style="padding:16px 18px">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Trades</div>
+            <div id="dt-count" style="font-size:32px;font-weight:800;color:var(--text);line-height:1"></div>
+          </div>
+          <div class="card" style="padding:16px 18px">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Winrate</div>
+            <div id="dt-wr" style="font-size:32px;font-weight:800;line-height:1"></div>
+            <div id="dt-wl" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
+          </div>
+          <div class="card" style="padding:16px 18px">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Totaal RU</div>
+            <div id="dt-ru" style="font-size:32px;font-weight:800;line-height:1"></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div class="card" style="padding:16px 18px">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Totaal P&amp;L</div>
+            <div id="dt-pnl" style="font-size:28px;font-weight:800;line-height:1"></div>
+          </div>
+          <div class="card" style="padding:16px 18px">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Expectancy</div>
+            <div id="dt-exp" style="font-size:28px;font-weight:800;line-height:1"></div>
+            <div id="dt-exp-sub" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
+          </div>
+        </div>
+      </div>
 
       <div class="card">
         <div class="ct">Gem. P&L statistieken</div>
@@ -617,7 +645,7 @@ input[type=range]{accent-color:var(--green);width:100%}
       <!-- Actieplan naleving -->
       <div class="card">
         <div class="ct">Actieplan naleving</div>
-        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Regels 1-3: op basis van jouw invoer per trade. Regel 4: automatisch berekend uit dagelijks RU-totaal. Klik op een regel voor details.</p>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Handmatige regels: op basis van jouw invoer per trade. Daglimiet ⚡: automatisch berekend uit dagelijks RU-totaal. Klik op een regel voor details.</p>
         <div id="actieplan-stats"></div>
       </div>
     </div>
@@ -646,7 +674,7 @@ input[type=range]{accent-color:var(--green);width:100%}
       <!-- Actieplan regels -->
       <div class="card">
         <div class="ct">Actieplan regels beheren</div>
-        <p style="font-size:12px;color:var(--text3);margin-bottom:14px">Voeg actieplan regels toe of verwijder ze. Bestaande trade-data (✓/✗ per regel) blijft behouden op basis van regelpositie.</p>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:14px">Voeg handmatige actieplan regels toe of verwijder ze. De <b style="color:var(--amber)">⚡ Daglimiet -3R</b> staat apart in het dashboard en wordt automatisch berekend — die hoef je hier niet toe te voegen.</p>
         <div id="rules-manage-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
         <button onclick="addRuleEntry()" style="font-size:13px;padding:9px 16px;border:.5px solid var(--green);border-radius:var(--rsm);background:transparent;color:var(--green);cursor:pointer;width:100%">+ Regel toevoegen</button>
       </div>
@@ -1842,9 +1870,34 @@ function makeBtBtn(t, idx){
   </div>`;
 }
 
-// ============================================================
-//  LOG RENDER
-// ============================================================
+function makeActieplanBtn(t, idx){
+  const rules = t.rules||[];
+  // Check if any rules are filled in
+  const filled = rules.filter(v=>v===1||v===-1);
+  if(!filled.length){
+    return `<button class="icon-btn" title="Actieplan niet ingevuld" onclick="openEdit(${idx})" style="color:var(--text3);opacity:.4">✔</button>`;
+  }
+  const rows = RULES.map((r,i)=>{
+    const v = rules[i]||0;
+    const icon = v===1?'✓':v===-1?'✗':'·';
+    const color = v===1?'var(--green)':v===-1?'var(--red)':'var(--text3)';
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:2px 0">
+      <span style="font-weight:700;color:${color};width:12px;text-align:center">${icon}</span>
+      <span style="color:var(--text2)">${r.label} <span style="color:var(--text3);font-weight:400">— ${r.desc}</span></span>
+    </div>`;
+  }).join('');
+  const allGood = rules.slice(0,RULES.length).every(v=>v===1);
+  const anyBad  = rules.slice(0,RULES.length).some(v=>v===-1);
+  const dotColor = allGood?'var(--green)':anyBad?'var(--red)':'var(--amber)';
+  return `<div style="position:relative;display:inline-block" onmouseenter="this.querySelector('.notes-popup').style.display='block'" onmouseleave="this.querySelector('.notes-popup').style.display='none'">
+    <button class="icon-btn" onclick="openEdit(${idx})" style="color:${dotColor}">✔</button>
+    <span style="position:absolute;top:-3px;right:-3px;background:${dotColor};color:#fff;border-radius:50%;width:10px;height:10px;font-size:8px;display:flex;align-items:center;justify-content:center;pointer-events:none;line-height:1">${anyBad?'✗':'✓'}</span>
+    <div class="notes-popup" style="display:none;min-width:180px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">Actieplan</div>
+      ${rows}
+    </div>
+  </div>`;
+}
 let sortCol = 'date';
 let sortDir = -1; // -1 = descending, 1 = ascending
 
@@ -1907,6 +1960,7 @@ function renderLog(){
           ${makeNotesBtn(t)}
           <button class="icon-btn" title="Bewerken" onclick="openEdit(${idx})">✏</button>
           <button class="icon-btn" title="Kopiëren" onclick="copyTrade(${idx})">⧉</button>
+          ${makeActieplanBtn(t,idx)}
           ${makeBtBtn(t,idx)}
           <button class="icon-btn" title="Verwijderen" onclick="delTrade(${idx})" style="color:var(--red)">×</button>
         </div>
@@ -2672,7 +2726,8 @@ document.addEventListener('touchend', e=>{
 //  SAVE / EDIT / DELETE
 // ============================================================
 // ============================================================
-//  ACTIEPLAN — regels 1-3 handmatig, regel 4 automatisch
+//  ACTIEPLAN — handmatige regels (beheerbaar via Beheer-tab)
+//  De daglimiet -3R staat apart in het dashboard en is altijd automatisch
 // ============================================================
 const RULES = [
   {id:'rule1', label:'Regel 1', desc:'Positiegrootte berekend v\u00f3\u00f3r entry'},
@@ -2822,7 +2877,7 @@ function renderActieplanStats(all){
   html += `<div style="height:.5px;background:var(--border);margin:4px 0 12px"></div>
     <div style="margin-bottom:6px;cursor:pointer" onclick="openRule4Popup()" title="Klik voor details">
       <div style="display:flex;justify-content:space-between;margin-bottom:5px">
-        <span style="font-size:12px;font-weight:600;color:var(--text2)">Regel 4 — Daglimiet -3R ↗ <span style="font-size:10px;color:var(--amber);font-weight:400">(automatisch)</span></span>
+        <span style="font-size:12px;font-weight:600;color:var(--text2)">⚡ Daglimiet -3R ↗ <span style="font-size:10px;color:var(--amber);font-weight:400">(automatisch berekend)</span></span>
         <span style="font-size:10px;color:var(--text3)">${tot} handelsdagen</span>
       </div>
       <div style="display:flex;height:16px;border-radius:4px;overflow:hidden;gap:1px;margin-bottom:4px">
@@ -2883,7 +2938,7 @@ function openRule4Popup(){
   const ok=entries.filter(([,ru])=>ru>=-3);
 
   document.getElementById('chart-popup-filters').style.display='none';
-  document.getElementById('chart-popup-title').innerHTML=`Regel 4 — Daglimiet -3R <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+  document.getElementById('chart-popup-title').innerHTML=`⚡ Daglimiet -3R (automatisch) <button class="modal-close" onclick="closeChartPopup()">×</button>`;
   document.querySelector('#chart-popup .cw').innerHTML=`
     <div style="background:rgba(59,130,246,.08);border:.5px solid rgba(59,130,246,.25);border-radius:var(--rsm);padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.6">
       Daglimiet = <b>-3R per dag</b>. Bereikt? Platform dicht.<br>
@@ -3917,6 +3972,28 @@ function renderDash(){
 
   // Render risk entries widget
   renderRiskEntries();
+
+  // ── Trades summary card ──────────────────────────────────────────────────
+  const card = document.getElementById('dash-trades-card');
+  if(card){
+    card.style.display = 'block';
+    const wr2 = all.length ? Math.round(wins/all.length*100) : 0;
+    document.getElementById('dt-count').textContent = all.length;
+    const dtWr = document.getElementById('dt-wr');
+    dtWr.textContent = wr2 + '%';
+    dtWr.style.color = wr2>=50 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('dt-wl').textContent = wins+'W '+losses+'L'+(be?' '+be+'BE':'');
+    const dtRu = document.getElementById('dt-ru');
+    dtRu.textContent = (totalRU>=0?'+':'')+fmt(totalRU,2)+'R';
+    dtRu.style.color = totalRU>=0 ? 'var(--green)' : 'var(--red)';
+    const dtPnl = document.getElementById('dt-pnl');
+    dtPnl.textContent = (totalPnl>=0?'+':'')+'$'+fmt(Math.abs(totalPnl),2);
+    dtPnl.style.color = totalPnl>=0 ? 'var(--green)' : 'var(--red)';
+    const dtExp = document.getElementById('dt-exp');
+    dtExp.textContent = exp!==null ? expStr : '—';
+    dtExp.style.color = expColor==='pos' ? 'var(--green)' : expColor==='neg' ? 'var(--red)' : 'var(--text2)';
+    document.getElementById('dt-exp-sub').textContent = expUSD!=null ? expUSDStr+' per trade' : '';
+  }
 
   document.getElementById('dash-kpis').innerHTML = `
     <div class="m"><div class="ml">Winrate</div><div class="mv ${wr>=50?'pos':'neg'}">${wr}%</div><div class="ms">${wins}/${all.length}</div></div>
