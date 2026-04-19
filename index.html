@@ -107,8 +107,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 input[type=text],input[type=number],input[type=date],input[type=time],input[type=url],select,textarea{
   width:100%;background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--rsm);
   color:var(--text);font-size:15px;padding:10px 12px;appearance:none;-webkit-appearance:none;outline:none;transition:border-color .15s}
-input.inp-pos{border-color:var(--green);background:rgba(16,185,129,0.08)}
-input.inp-neg{border-color:var(--red);background:rgba(244,63,94,0.08)}
+input.inp-pos{border-color:var(--green);background:rgba(16,185,129,0.08);color:var(--green);font-weight:700}
+input.inp-neg{border-color:var(--red);background:rgba(244,63,94,0.08);color:var(--red);font-weight:700}
 input.inp-zero{border-color:var(--text3)}
 input:focus,select:focus{border-color:var(--blue)}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -366,13 +366,13 @@ input[type=range]{accent-color:var(--green);width:100%}
         <div id="broker-panel" style="display:none;margin-top:10px">
           <!-- Format toggle -->
           <div style="display:flex;gap:6px;margin-bottom:10px">
-            <button type="button" id="fmt-filled-btn" onclick="setBrokerFormat('filled')"
-              style="flex:1;padding:8px;border-radius:var(--rsm);border:.5px solid var(--green);background:rgba(16,185,129,.15);color:var(--green);cursor:pointer;font-size:12px;font-weight:600">
-              📋 Filled orders
-            </button>
             <button type="button" id="fmt-history-btn" onclick="setBrokerFormat('history')"
-              style="flex:1;padding:8px;border-radius:var(--rsm);border:.5px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;font-size:12px;font-weight:600">
+              style="flex:1;padding:8px;border-radius:var(--rsm);border:.5px solid var(--blue);background:rgba(59,130,246,.15);color:var(--blue);cursor:pointer;font-size:12px;font-weight:600">
               📜 Order history
+            </button>
+            <button type="button" id="fmt-filled-btn" onclick="setBrokerFormat('filled')"
+              style="flex:1;padding:8px;border-radius:var(--rsm);border:.5px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;font-size:12px;font-weight:600">
+              📋 Filled orders
             </button>
           </div>
           <div id="broker-format-info" style="background:rgba(59,130,246,.08);border:.5px solid rgba(59,130,246,.25);border-radius:var(--rsm);padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--text3);line-height:1.7">
@@ -3153,7 +3153,7 @@ function detectBrokerFormat(rows){
 
 
 // ── Broker format state ───────────────────────────────────────────────────────
-let brokerFormat = 'filled'; // 'filled' | 'history'
+let brokerFormat = 'history'; // 'filled' | 'history' — default: order history
 
 function setBrokerFormat(fmt){
   brokerFormat = fmt;
@@ -3669,6 +3669,9 @@ function importBrokerTrade(uid){
     const risk = t.totalRisk > 0 ? t.totalRisk : getRiskForDate(t.date);
     if(risk>0) document.getElementById('f-ru').value=String(Math.round(t.pnl/risk*100)/100).replace('.',',');
     setDir(t.dir);
+    // Apply color classes to pnl/ru fields
+    onPnlChange(document.getElementById('f-pnl'));
+    onRuChange(document.getElementById('f-ru'));
     // Build detailed notes with each partial close listed separately
     const partialLines = (t._closes||[]).map((c,i)=>{
       const pnlStr = (c.net>=0?'+':'')+'$'+fmt(Math.abs(c.net),2);
