@@ -623,6 +623,13 @@ input[type=range]{accent-color:var(--green);width:100%}
         </div>
       </div>
 
+      <!-- Gedragsanalyse -->
+      <div class="card" id="card-gedrag" style="display:none">
+        <div class="ct">Gedragsanalyse — TP vs werkelijke exit</div>
+        <p style="font-size:11px;color:var(--text3);margin-bottom:14px">Gebaseerd op trades geïmporteerd via order history. Toont hoeveel winst op tafel bleef en je gedragspatronen.</p>
+        <div id="gedrag-stats"></div>
+      </div>
+
       <!-- Actieplan naleving -->
       <div class="card">
         <div class="ct">Actieplan naleving</div>
@@ -717,6 +724,27 @@ input[type=range]{accent-color:var(--green);width:100%}
     <div style="padding:10px 18px 14px;display:flex;gap:8px;border-top:.5px solid var(--border);flex-shrink:0;background:var(--bg2)">
       <button class="icon-btn" id="td-edit-btn" style="font-size:13px;padding:7px 14px;border:.5px solid var(--border2);border-radius:var(--rsm);flex:1">&#9998; Bewerken</button>
       <button class="icon-btn" id="td-bt-btn" style="font-size:13px;padding:7px 14px;border:.5px solid var(--border2);border-radius:var(--rsm);flex:1">&#128202; Backtest</button>
+      <button class="icon-btn" id="td-ai-btn" onclick="openAIAnalysis()" style="font-size:13px;padding:7px 14px;border:.5px solid rgba(139,92,246,.4);border-radius:var(--rsm);flex:1;color:#a78bfa;display:none">&#129302; Analyseer</button>
+    </div>
+  </div>
+
+  <!-- AI Analysis popup -->
+  <div id="ai-analysis-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;overflow-y:auto;padding:20px;box-sizing:border-box" onclick="if(event.target===this)closeAIAnalysis()">
+    <div style="max-width:680px;margin:0 auto;background:var(--bg2);border-radius:var(--r);border:.5px solid var(--border2);overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:.5px solid var(--border);background:var(--bg3)">
+        <span style="font-weight:700;color:var(--text)">&#129302; AI Trade Analyse</span>
+        <button onclick="closeAIAnalysis()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer">×</button>
+      </div>
+      <div id="ai-analysis-content" style="padding:18px;min-height:200px;font-size:13px;line-height:1.7;color:var(--text2)">
+        <div style="text-align:center;padding:40px;color:var(--text3)">
+          <div style="font-size:32px;margin-bottom:12px">&#129302;</div>
+          Klik op "Genereer analyse" om een volledige gedragsanalyse te starten.
+        </div>
+      </div>
+      <div style="padding:12px 18px;border-top:.5px solid var(--border);background:var(--bg3);display:flex;gap:8px;align-items:center">
+        <button id="ai-generate-btn" onclick="generateAIAnalysis()" style="padding:9px 20px;background:#7c3aed;color:#fff;border:none;border-radius:var(--rsm);cursor:pointer;font-size:13px;font-weight:600">&#9889; Genereer analyse</button>
+        <span id="ai-status" style="font-size:11px;color:var(--text3)"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -2175,6 +2203,14 @@ function openTradeDetail(idx, scrollToImg){
   // Wire edit / bt buttons
   document.getElementById('td-edit-btn').onclick = () => { closeTradeDetail(); openEdit(idx); };
   document.getElementById('td-bt-btn').onclick   = () => { closeTradeDetail(); openBt(idx); };
+  // Show AI analyse button only for trades with TP analytics
+  const aiBtn = document.getElementById('td-ai-btn');
+  const t = trades[idx];
+  if(aiBtn){
+    const hasAIData = t && t.bt && (t.bt.missedPnl!=null || t.notes);
+    aiBtn.style.display = hasAIData ? '' : 'none';
+    window._aiTradeIdx = idx;
+  }
 
   document.getElementById('trade-detail').style.display = 'flex';
 
@@ -2815,6 +2851,115 @@ function setEditRulesFromArray(arr){ RULES.forEach((r,i)=>{ editRuleState[r.id]=
 // ── Dashboard: actieplan statistieken ───────────────────────────────────────
 let _actieplanAll = [];
 
+function renderGedragStats(all){
+  const card = document.getElementById('card-gedrag');
+  const el   = document.getElementById('gedrag-stats');
+  if(!card||!el) return;
+
+  // Only trades with TP analytics (imported via order history)
+  const tpTrades = all.filter(t=>t.bt&&t.bt.missedPnl!=null);
+  if(!tpTrades.length){ card.style.display='none'; return; }
+  card.style.display='block';
+
+  // Core metrics
+  const totalMissed    = Math.round(tpTrades.reduce((s,t)=>s+(t.bt.missedPnl||0),0)*100)/100;
+  const totalMissedRU  = Math.round(tpTrades.reduce((s,t)=>s+(t.bt.missedRU||0),0)*100)/100;
+  const avgEfficiency  = Math.round(tpTrades.reduce((s,t)=>s+(t.bt.efficiency||0),0)/tpTrades.length);
+  const earlyExits     = tpTrades.filter(t=>(t.bt.missedPnl||0)>0).length; // left money on table
+  const earlyExitPct   = Math.round(earlyExits/tpTrades.length*100);
+  const avgPlannedRR   = tpTrades.filter(t=>t.bt.plannedRR).length
+    ? Math.round(tpTrades.filter(t=>t.bt.plannedRR).reduce((s,t)=>s+t.bt.plannedRR,0)/tpTrades.filter(t=>t.bt.plannedRR).length*10)/10
+    : null;
+  const avgRealRR      = tpTrades.filter(t=>t.ru&&t.bt.totalRisk).length
+    ? Math.round(tpTrades.filter(t=>t.ru).reduce((s,t)=>s+(+t.ru||0),0)/tpTrades.filter(t=>t.ru).length*100)/100
+    : null;
+
+  // Worst early exits (most money left behind)
+  const worst = tpTrades.filter(t=>(t.bt.missedPnl||0)>0)
+    .sort((a,b)=>(b.bt.missedPnl||0)-(a.bt.missedPnl||0)).slice(0,5);
+
+  const missedColor = totalMissed>0?'var(--red)':'var(--green)';
+
+  el.innerHTML = `
+    <!-- KPI row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">
+      <div class="m" style="background:rgba(244,63,94,.08);border:.5px solid rgba(244,63,94,.2)">
+        <div class="ml">Totaal gemist</div>
+        <div class="mv" style="color:${missedColor}">${totalMissed>=0?'+':''}$${fmt(Math.abs(totalMissed),2)}</div>
+        <div class="ms">${totalMissedRU>=0?'+':''}${fmt(totalMissedRU,2)}R op tafel</div>
+      </div>
+      <div class="m">
+        <div class="ml">Te vroeg gesloten</div>
+        <div class="mv" style="color:${earlyExitPct>50?'var(--red)':'var(--amber)'}">${earlyExitPct}%</div>
+        <div class="ms">${earlyExits} van ${tpTrades.length} trades</div>
+      </div>
+      <div class="m">
+        <div class="ml">Gem. efficiency</div>
+        <div class="mv" style="color:${avgEfficiency>=80?'var(--green)':avgEfficiency>=50?'var(--amber)':'var(--red)'}">${avgEfficiency}%</div>
+        <div class="ms">van TP-beweging gepakt</div>
+      </div>
+      ${avgPlannedRR?`<div class="m">
+        <div class="ml">Gepland R:R</div>
+        <div class="mv">1:${fmt(avgPlannedRR,1)}</div>
+        <div class="ms">gem. over ${tpTrades.filter(t=>t.bt.plannedRR).length} trades</div>
+      </div>`:''}
+      ${avgRealRR!==null?`<div class="m">
+        <div class="ml">Werkelijk R:R</div>
+        <div class="mv" style="color:${avgRealRR>=0?'var(--green)':'var(--red)'}">${avgRealRR>=0?'+':''}${fmt(avgRealRR,2)}R</div>
+        <div class="ms">gem. behaald RU</div>
+      </div>`:''}
+    </div>
+
+    <!-- Efficiency bar -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">EFFICIENCY VERDELING</div>
+      <div style="display:flex;height:20px;border-radius:4px;overflow:hidden;gap:1px">
+        ${(()=>{
+          const buckets=[
+            {label:'<0%',  color:'#7f1d1d', count:tpTrades.filter(t=>(t.bt.efficiency||0)<0).length},
+            {label:'0-50%',color:'var(--red)', count:tpTrades.filter(t=>(t.bt.efficiency||0)>=0&&(t.bt.efficiency||0)<50).length},
+            {label:'50-80%',color:'var(--amber)', count:tpTrades.filter(t=>(t.bt.efficiency||0)>=50&&(t.bt.efficiency||0)<80).length},
+            {label:'80-100%',color:'var(--green)', count:tpTrades.filter(t=>(t.bt.efficiency||0)>=80&&(t.bt.efficiency||0)<100).length},
+            {label:'>100%',color:'#065f46', count:tpTrades.filter(t=>(t.bt.efficiency||0)>=100).length},
+          ].filter(b=>b.count>0);
+          return buckets.map(b=>{
+            const pct=Math.round(b.count/tpTrades.length*100);
+            return `<div title="${b.label}: ${b.count}× (${pct}%)" style="width:${pct}%;background:${b.color};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;min-width:${pct>8?'0':'0'}px">${pct>=10?b.label:''}</div>`;
+          }).join('');
+        })()}
+      </div>
+      <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;color:var(--text3);flex-wrap:wrap">
+        ${[
+          {l:'Onder 0%',c:'#7f1d1d'},
+          {l:'0–50%',c:'var(--red)'},
+          {l:'50–80%',c:'var(--amber)'},
+          {l:'80–100%',c:'var(--green)'},
+          {l:'Boven 100%',c:'#065f46'},
+        ].map(b=>`<span><span style="display:inline-block;width:8px;height:8px;background:${b.c};border-radius:2px;margin-right:3px"></span>${b.l}</span>`).join('')}
+      </div>
+    </div>
+
+    <!-- Worst early exits -->
+    ${worst.length?`<div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600">MEESTE WINST OP TAFEL GELATEN</div>
+      ${worst.map(t=>`
+        <div onclick="openTradeDetail(${trades.indexOf(t)})" style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:.5px solid var(--border);cursor:pointer">
+          <div>
+            <span style="font-weight:600;color:var(--text)">${t.ticker}</span>
+            <span style="font-size:11px;color:var(--text3);margin-left:6px">${t.dir} · ${fmtDate(t.date,true)}</span>
+            <div style="font-size:10px;color:var(--text3);margin-top:1px">
+              efficiency ${t.bt.efficiency}% · gepland R:R 1:${fmt(t.bt.plannedRR||0,1)}
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700;color:var(--red)">+$${fmt(t.bt.missedPnl,2)} gemist</div>
+            <div style="font-size:10px;color:var(--text3)">+${fmt(t.bt.missedRU,2)}R op tafel</div>
+          </div>
+        </div>`).join('')}
+    </div>`:''}
+  `;
+}
+
 function renderActieplanStats(all){
   _actieplanAll = all;
   const el = document.getElementById('actieplan-stats');
@@ -3305,6 +3450,32 @@ function parseOrderHistory(text){
       const riskPerShare = initialSL ? Math.abs(avgEntry-initialSL) : null;
       const totalRisk    = riskPerShare ? Math.round(riskPerShare*matchQty*100)/100 : null;
 
+      // TP: take profit orders within this trade's time window
+      const tpSide = currentDir==='Long' ? 'sell' : 'buy';
+      const tpRows = sorted.filter(r=>
+        r.side===tpSide &&
+        /take profit/i.test(r.type) &&
+        r.dt >= tradeStart && r.dt <= tradeEnd &&
+        r.price>0
+      );
+      const initialTP    = tpRows.length ? tpRows[0].price : null;
+      const activeTpRows = tpRows.filter(r=>!/cancelled/i.test(r.status));
+      const activeTP     = activeTpRows.length ? activeTpRows[activeTpRows.length-1].price : initialTP;
+      const tpMoves      = tpRows.length;
+
+      // Gemiste winst: verschil tussen wat behaald is en wat bij activeTP zou zijn
+      let missedPnl=null, missedRU=null, plannedRR=null, efficiency=null;
+      if(activeTP!==null && totalRisk){
+        const tpPnl = currentDir==='Long'
+          ? Math.round((activeTP-avgEntry)*matchQty*100)/100
+          : Math.round((avgEntry-activeTP)*matchQty*100)/100;
+        missedPnl  = Math.round((tpPnl-calcPnl)*100)/100;
+        const riskPs = totalRisk/matchQty;
+        missedRU   = riskPs ? Math.round(missedPnl/riskPs*100)/100 : null;
+        plannedRR  = riskPerShare ? Math.round(Math.abs(avgEntry-activeTP)/riskPerShare*100)/100 : null;
+        efficiency = tpPnl!==0 ? Math.round(calcPnl/tpPnl*100) : null;
+      }
+
       const closesDetail = closes.map(r=>{
         const fee   = calcExecFee(r.qty, r.exchange||exchange);
         const gross = currentDir==='Long'
@@ -3320,8 +3491,9 @@ function parseOrderHistory(text){
         avgExit :Math.round(avgExit*10000)/10000,
         pnl:calcPnl, grossPnl, totalFees, exchange,
         partials:closes.length,
-        initialSL, riskPerShare, totalRisk,
-        slMoves:slRows.length,
+        initialSL, riskPerShare, totalRisk, slMoves:slRows.length,
+        initialTP, activeTP, tpMoves,
+        missedPnl, missedRU, plannedRR, efficiency,
         _closes:closesDetail,
         imported:false,
         _uid:ticker+'_'+opens[0].date+'_'+opens[0].time+'_'+Math.round(Math.random()*1e9)
@@ -3565,7 +3737,8 @@ function renderBrokerResult(){
               </div>
               <div style="font-size:10px;color:var(--text3);margin-top:2px">
                 entry $${fmt(t.avgEntry,2)} → exit $${fmt(t.avgExit,2)} · ${t.partials} deelsluiting${t.partials!==1?'en':''}
-                ${t.initialSL ? `<span style="color:var(--amber);margin-left:8px">SL $${fmt(t.initialSL,2)} · risk $${fmt(t.totalRisk,2)} · ${t.slMoves} SL aanpassingen</span>` : ''}
+                ${t.initialSL ? `<span style="color:var(--amber);margin-left:8px">SL $${fmt(t.initialSL,2)} · risk $${fmt(t.totalRisk,2)} · ${t.slMoves} SL aanpassing${t.slMoves!==1?'en':''}</span>` : ''}
+                ${t.activeTP  ? `<span style="color:#38bdf8;margin-left:8px">TP $${fmt(t.activeTP,2)}${t.missedRU!==null?' · gemist '+fmt(t.missedRU,2)+'R':''}</span>` : ''}
                 ${t.totalFees ? `<span style="color:var(--text3);margin-left:8px">fees -$${fmt(t.totalFees,2)} · bruto $${fmt(t.grossPnl,2)}</span>` : ''}
               </div>
             </div>
@@ -3678,17 +3851,47 @@ function importBrokerTrade(uid){
       const priceStr = '$'+fmt(c.price,2);
       return `  ${i+1}. ${fmtQty(c.qty)}× @ ${priceStr}  →  ${pnlStr}`;
     }).join('\n');
+
     const slLine = t.initialSL
-      ? [`SL:     $${fmt(t.initialSL,2)} (risk $${fmt(t.totalRisk,2)} · ${t.slMoves} aanpassingen)`, ``]
+      ? [`SL:          $${fmt(t.initialSL,2)} | risk $${fmt(t.totalRisk,2)} | ${t.slMoves} aanpassingen`]
       : [];
+    const tpLine = t.activeTP
+      ? [`TP (actief): $${fmt(t.activeTP,2)}${t.initialTP&&t.initialTP!==t.activeTP?' (initieel $'+fmt(t.initialTP,2)+')':''} | ${t.tpMoves} aanpassingen`]
+      : [];
+    const exitLine = [`Exit:        $${fmt(t.avgExit,2)} (${t.partials} deelsluiting${t.partials!==1?'en':''})`];
     const feeLine = t.totalFees
-      ? [`Fees:   -$${fmt(t.totalFees,2)} (bruto $${fmt(t.grossPnl,2)})`]
+      ? [`Fees:        -$${fmt(t.totalFees,2)} (bruto $${fmt(t.grossPnl,2)})`]
       : [];
+
+    // Resultaat sectie
+    const resultLines = [``, `Resultaat:`];
+    const pnlStr2 = (t.pnl>=0?'+':'')+'$'+fmt(Math.abs(t.pnl),2);
+    const ruStr   = t.totalRisk && t.totalRisk>0
+      ? ' ('+fmt(Math.round(t.pnl/(t.totalRisk/t.qty)*100)/100,2)+'R)'
+      : '';
+    resultLines.push(`  Behaald:   ${pnlStr2}${ruStr}`);
+    if(t.activeTP && t.totalRisk){
+      const tpPnl = t.dir==='Long'
+        ? Math.round((t.activeTP-t.avgEntry)*t.qty*100)/100
+        : Math.round((t.avgEntry-t.activeTP)*t.qty*100)/100;
+      const tpRu  = Math.round(tpPnl/(t.totalRisk/t.qty)*100)/100;
+      resultLines.push(`  Bij TP:    ${tpPnl>=0?'+':''}$${fmt(Math.abs(tpPnl),2)} (${fmt(tpRu,2)}R)`);
+      if(t.missedPnl!==null){
+        resultLines.push(`  Gemist:    ${t.missedPnl>=0?'+':''}$${fmt(Math.abs(t.missedPnl),2)} (${fmt(t.missedRU,2)}R)`);
+      }
+      if(t.plannedRR!==null) resultLines.push(`  R:R gepland: 1:${fmt(t.plannedRR,1)}`);
+      if(t.efficiency!==null) resultLines.push(`  Efficiency:  ${t.efficiency}%`);
+    }
+
     const notesText = [
       `Import: ${fmtQty(t.qty)}× ${t.ticker} ${t.dir}`,
       `Entry:  $${fmt(t.avgEntry,2)}`,
       ...slLine,
+      ...tpLine,
+      ...exitLine,
       ...feeLine,
+      ...resultLines,
+      ``,
       `Deelsluitingen (${t.partials}):`,
       partialLines || `  Exit: $${fmt(t.avgExit,2)}`
     ].join('\n');
@@ -3697,6 +3900,17 @@ function importBrokerTrade(uid){
     document.querySelector('.content').scrollTop=300;
     const card=document.getElementById('f-ticker').closest('.card');
     if(card){card.style.boxShadow='0 0 0 2px var(--green)';setTimeout(()=>card.style.boxShadow='',1500);}
+    // Store TP analytics in bt field so dashboard can use them
+    if(t.missedPnl!==null||t.efficiency!==null){
+      window._pendingBtData = {
+        missedPnl: t.missedPnl, missedRU: t.missedRU,
+        plannedRR: t.plannedRR, efficiency: t.efficiency,
+        activeTP: t.activeTP, initialTP: t.initialTP,
+        totalRisk: t.totalRisk
+      };
+    } else {
+      window._pendingBtData = null;
+    }
     // Mark as imported and refresh broker result list
     if(t) t.imported=true;
     renderBrokerResult();
@@ -3745,6 +3959,7 @@ function clearForm(){
   ['f-ticker','f-pnl','f-ru','f-link','f-notes'].forEach(id=>{ const el=document.getElementById(id); el.value=''; el.className=''; });
   resetRules();
   window._isImportedTrade=false;
+  window._pendingBtData=null;
   unlockImportFields();
   document.querySelectorAll('#emo-grid .eo').forEach(e=>e.classList.remove('sel'));
   starVal=0; litStars(0); setDir('Long');
@@ -3791,7 +4006,7 @@ async function saveTrade(){
     notes: document.getElementById('f-notes').value.trim(),
     rules: getRulesArray(),
     isImported: window._isImportedTrade||false,
-    images: imgUrls, bt: {}
+    images: imgUrls, bt: window._pendingBtData ? {...window._pendingBtData} : {}
   };
   showSyncStatus('⏳ Opslaan...');
   try {
@@ -3972,6 +4187,107 @@ function closeEditModal(e){ if(!e||e.target===document.getElementById('edit-moda
 // ============================================================
 //  BACKTEST MODAL
 // ============================================================
+// ── AI Trade Analyse ─────────────────────────────────────────────────────────
+function openAIAnalysis(){
+  document.getElementById('ai-analysis-overlay').style.display='block';
+  document.getElementById('ai-status').textContent='';
+}
+function closeAIAnalysis(){
+  document.getElementById('ai-analysis-overlay').style.display='none';
+}
+
+async function generateAIAnalysis(){
+  const idx = window._aiTradeIdx;
+  const t   = trades[idx];
+  if(!t) return;
+
+  const btn    = document.getElementById('ai-generate-btn');
+  const status = document.getElementById('ai-status');
+  const content= document.getElementById('ai-analysis-content');
+
+  btn.disabled=true; btn.textContent='⏳ Analyseren...';
+  status.textContent='Claude analyseert je trade...';
+  content.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:28px;margin-bottom:8px">⏳</div>Analyse wordt gegenereerd...</div>';
+
+  // Build rich context from all available data
+  const bt  = t.bt||{};
+  const risk = bt.totalRisk || getRiskForDate(t.date);
+  const maxShares = risk>0 && t.ru ? Math.round(risk/Math.abs(+t.ru||1)) : null;
+
+  const prompt = `Je bent een trading coach. Analyseer deze trade en geef concrete, eerlijke feedback in het Nederlands.
+
+TRADE DATA:
+Ticker: ${t.ticker} | Richting: ${t.dir} | Datum: ${t.date} ${t.time||''}
+Entry: $${fmt(t.avgEntry||0,2)} | Exit: $${fmt(t.avgExit||0,2)}
+Positiegrootte: ${t.qty||'?'} shares${maxShares&&t.qty>maxShares?' (max correct: '+maxShares+' shares, jij nam '+(Math.round((t.qty/maxShares)*10)/10)+'× te veel)':''}
+Resultaat: $${fmt(+t.pnl||0,2)} | ${fmt(+t.ru||0,2)}R
+Risk (1R): $${fmt(risk,2)}
+
+${bt.initialSL?`STOPLOSS:
+  Initieel: $${fmt(bt.initialSL,2)}
+  SL aanpassingen: ${bt.slMoves||0}×`:''}
+
+${bt.activeTP?`TAKE PROFIT:
+  Actief bij exit: $${fmt(bt.activeTP,2)}
+  Initieel: $${fmt(bt.initialTP||bt.activeTP,2)}
+  TP aanpassingen: ${bt.tpMoves||0}×`:''}
+
+${bt.missedPnl!=null?`ANALYSE:
+  Bij TP bereikt: +$${fmt(Math.abs(bt.missedPnl+(+t.pnl||0)),2)} (+${fmt(bt.plannedRR||0,1)}R)
+  Werkelijk behaald: $${fmt(+t.pnl||0,2)} (${fmt(+t.ru||0,2)}R)
+  Gemist: $${fmt(bt.missedPnl,2)} (${fmt(bt.missedRU||0,2)}R)
+  Gepland R:R: 1:${fmt(bt.plannedRR||0,1)}
+  Efficiency: ${bt.efficiency||0}%`:''}
+
+OPMERKINGEN VAN TRADER:
+${t.notes||'(geen)'}
+
+STRATEGIE: ${t.strat||'niet ingevuld'}
+PLAN GEVOLGD: ${t.plan||'?'}
+EMOTIES: ${(t.emos||[]).join(', ')||'geen'}
+STERREN: ${t.stars||0}/5
+
+Geef je analyse in deze vaste structuur (gebruik HTML voor opmaak):
+1. <h3>📊 Kerngetallen</h3> — 3-4 bullets met de belangrijkste cijfers
+2. <h3>✅ Wat je goed deed</h3> — 2-3 concrete punten
+3. <h3>⚠️ Wat anders had gekund</h3> — 2-3 concrete verbeterpunten met cijfers
+4. <h3>🎯 Scenario vergelijking</h3> — tabel: werkelijk / bij TP / bij SL / correct sizing
+5. <h3>💡 Eén ding voor volgende trade</h3> — één concrete actie
+
+Wees specifiek, gebruik de exacte cijfers uit de data. Wees eerlijk maar constructief.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1500,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data = await resp.json();
+    const text = (data.content||[]).map(c=>c.text||'').join('');
+    content.innerHTML = `<div style="font-size:13px;line-height:1.8;color:var(--text2)">${
+      text
+        .replace(/<h3>/g,'<h3 style="font-size:14px;font-weight:700;color:var(--text);margin:16px 0 8px;border-bottom:.5px solid var(--border);padding-bottom:4px">')
+        .replace(/<h4>/g,'<h4 style="font-size:13px;font-weight:600;color:var(--text);margin:10px 0 4px">')
+        .replace(/<ul>/g,'<ul style="margin:6px 0 6px 20px">')
+        .replace(/<li>/g,'<li style="margin:3px 0">')
+        .replace(/<table>/g,'<table style="width:100%;border-collapse:collapse;margin:8px 0">')
+        .replace(/<td>/g,'<td style="padding:6px 8px;border:.5px solid var(--border)">')
+        .replace(/<th>/g,'<th style="padding:6px 8px;border:.5px solid var(--border);background:var(--bg3);font-weight:600">')
+        .replace(/\*\*(.*?)\*\*/g,'<b>$1</b>')
+        .replace(/\n\n/g,'<br><br>')
+    }</div>`;
+    status.textContent='✓ Analyse klaar';
+  } catch(err){
+    content.innerHTML=`<div style="color:var(--red);padding:20px">⚠ Analyse mislukt: ${err.message}</div>`;
+    status.textContent='';
+  }
+  btn.disabled=false; btn.textContent='↺ Heranalyseer';
+}
+
 function openBt(i){
   btIdx = i;
   const t = trades[i];
@@ -4321,6 +4637,7 @@ function renderDash(){
   renderMissedChart(all);
   renderStreaks(all);
   renderActieplanStats(all);
+  renderGedragStats(all);
   renderWeekdayChart(all);
   renderHourChart(all);
 }
