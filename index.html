@@ -91,7 +91,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   .eo{padding:13px 11px !important;min-height:44px}
   .btn{min-height:48px !important;font-size:15px !important}
   .btn-row{justify-content:stretch}
-  .btn-row .btn{flex:1}
+  .btn-row .btn{flex:1;min-height:48px;font-size:15px}
   .star{font-size:40px !important;padding:6px !important}
   input,select,textarea{font-size:16px !important} /* voorkomt zoom op iOS */
 }
@@ -119,10 +119,10 @@ input:focus,select:focus{border-color:var(--blue)}
 .db.short{background:var(--red-bg);color:var(--red)}
 .db.paper-on{background:var(--paper-bg);color:var(--paper)}
 .strow{display:flex;gap:7px;touch-action:manipulation}
-.star{font-size:36px;cursor:pointer;color:var(--bg3);transition:color .1s;user-select:none;line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent;padding:4px}
+.star{font-size:36px;cursor:pointer;color:var(--bg3);transition:color .1s;user-select:none;line-height:1;touch-action:manipulation;-webkit-tap-highlight-color:transparent;padding:8px;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
 .star.on{color:var(--amber)}
 .eg{display:flex;flex-direction:column;gap:5px}
-.eo{display:flex;align-items:center;gap:9px;padding:11px;border-radius:var(--rsm);border:.5px solid var(--border);background:var(--bg3);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.eo{display:flex;align-items:center;gap:9px;padding:13px 11px;border-radius:var(--rsm);border:.5px solid var(--border);background:var(--bg3);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px;-webkit-user-select:none;user-select:none}
 .eo.sel{border-color:var(--blue);background:var(--blue-bg);color:var(--text)}
 .edot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .imgdrop{border:1.5px dashed var(--border2);border-radius:var(--rsm);padding:22px 20px;text-align:center;cursor:pointer;font-size:13px;color:var(--text3);transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
@@ -132,7 +132,7 @@ input:focus,select:focus{border-color:var(--blue)}
 .img-thumb{position:relative;width:80px;height:60px;border-radius:var(--rsm);overflow:hidden;border:.5px solid var(--border2)}
 .img-thumb img{width:100%;height:100%;object-fit:cover}
 .img-del{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:50%;width:18px;height:18px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;line-height:1}
-.btn{padding:12px 24px;border-radius:var(--r);border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-width:120px}
+.btn{padding:12px 24px;border-radius:var(--r);border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-width:120px;min-height:44px}
 .btn-primary{background:var(--green);color:#fff;box-shadow:0 2px 12px rgba(16,185,129,.3)}
 .btn-primary:hover{background:#059669}
 .btn-primary:active{opacity:.85;transform:scale(.98)}
@@ -383,7 +383,7 @@ input[type=range]{accent-color:var(--green);width:100%}
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="overflow:visible">
         <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
           <span>Nieuwe trade invoeren</span>
           <button onclick="go('log')" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1;padding:0 2px" title="Sluiten">×</button>
@@ -414,7 +414,10 @@ input[type=range]{accent-color:var(--green);width:100%}
           </div>
           <div class="fg">
             <label>Winst / verlies (USD)</label>
-            <input type="text" inputmode="decimal" id="f-pnl" placeholder="0,00" oninput="onPnlChange(this)" onblur="fmtPnlBlur(this)">
+            <div style="display:flex;gap:6px;align-items:center">
+              <button type="button" onclick="togglePnlSign()" id="pnl-sign-btn" style="flex-shrink:0;width:34px;height:38px;border:.5px solid var(--border2);border-radius:var(--rsm);background:var(--bg3);color:var(--text2);font-size:18px;cursor:pointer;touch-action:manipulation">−</button>
+              <input type="text" inputmode="decimal" id="f-pnl" placeholder="0,00" oninput="onPnlChange(this)" onblur="fmtPnlBlur(this)" style="flex:1">
+            </div>
           </div>
         </div>
         <div class="fg"><label>Riskunits verdiend</label><input type="text" inputmode="decimal" id="f-ru" placeholder="0,00" oninput="onRuChange(this)" onblur="fmtRuBlur(this)"></div>
@@ -429,15 +432,22 @@ input[type=range]{accent-color:var(--green);width:100%}
         <div class="fg">
           <label>Emotie / gedragsfout</label>
           <div class="eg" id="emo-grid">
-            <div class="eo" data-val="Foutloos" onclick="toggleEmo(this)"><span class="edot" style="background:#10b981"></span>Geen verbeterpunten (foutloos)</div>
-            <div class="eo" data-val="Geldige entry niet genomen" onclick="toggleEmo(this)"><span class="edot" style="background:#3b82f6"></span>Geldige entry niet genomen (trigger fear)</div>
-            <div class="eo" data-val="Te vroege entry" onclick="toggleEmo(this)"><span class="edot" style="background:#f59e0b"></span>Te vroege entry (FOMO)</div>
-            <div class="eo" data-val="Te late entry" onclick="toggleEmo(this)"><span class="edot" style="background:#f97316"></span>Te late entry (trigger fear)</div>
-            <div class="eo" data-val="Stoploss verruimd" onclick="toggleEmo(this)"><span class="edot" style="background:#f43f5e"></span>Stoploss verruimd (fear of losing)</div>
-            <div class="eo" data-val="SL te snel BE" onclick="toggleEmo(this)"><span class="edot" style="background:#ec4899"></span>Stoploss te snel naar break-even</div>
-            <div class="eo" data-val="TP te snel" onclick="toggleEmo(this)"><span class="edot" style="background:#8b5cf6"></span>Take profit te snel gepakt</div>
-            <div class="eo" data-val="TP te ver" onclick="toggleEmo(this)"><span class="edot" style="background:#6366f1"></span>Take profit te ver weg (greed)</div>
-            <div class="eo" data-val="Te grote sharesize" onclick="toggleEmo(this)"><span class="edot" style="background:#f43f5e"></span>Te grote sharesize / te krappe stoploss (greed)</div>
+            <div class="eo" data-val="Foutloos" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#10b981"></span>Geen verbeterpunten (foutloos)</div>
+            <div class="eo" data-val="Geldige entry niet genomen" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#3b82f6"></span>Geldige entry niet genomen (trigger fear)</div>
+            <div class="eo" data-val="Te vroege entry" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#f59e0b"></span>Te vroege entry (FOMO)</div>
+            <div class="eo" data-val="Te late entry" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#f97316"></span>Te late entry (trigger fear)</div>
+            <div class="eo" data-val="Stoploss verruimd" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#f43f5e"></span>Stoploss verruimd (fear of losing)</div>
+            <div class="eo" data-val="SL gecancelled" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#dc2626"></span>Stoploss gecancelled (fear of losing)</div>
+            <div class="eo" data-val="SL te snel BE" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#ec4899"></span>Stoploss te snel naar break-even</div>
+            <div class="eo" data-val="TP te snel" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#8b5cf6"></span>Take profit te snel gepakt</div>
+            <div class="eo" data-val="TP te ver" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#6366f1"></span>Take profit te ver weg (greed)</div>
+            <div class="eo" data-val="Te grote sharesize" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#f43f5e"></span>Te grote sharesize / te krappe stoploss (greed)</div>
+            <div class="eo" data-val="Averaging down" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#b91c1c"></span>Averaging down (bijkopen in verlies)</div>
+            <div class="eo" data-val="Overmodificatie" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#d97706"></span>Overmodificatie (te veel aanpassingen)</div>
+            <div class="eo" data-val="Plan losgelaten" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#9f1239"></span>Plan losgelaten</div>
+            <div class="eo" data-val="Revenge trade" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#7f1d1d"></span>Revenge trade (verlies terugpakken)</div>
+            <div class="eo" data-val="Overtraden" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#92400e"></span>Overtraden (te veel trades op één dag)</div>
+            <div class="eo" data-val="Niet bijgehouden setup" ontouchend="event.preventDefault();toggleEmo(this)" onclick="toggleEmo(this)"><span class="edot" style="background:#1e3a5f"></span>Niet bijgehouden setup (trade buiten plan)</div>
           </div>
         </div>
         <div class="fg">
@@ -452,12 +462,12 @@ input[type=range]{accent-color:var(--green);width:100%}
         <!-- Actieplan controle (regels 1-3 handmatig) -->
         <div class="fg">
           <label>✔ Actieplan controle — klik ✓ gevolgd of ✗ gebroken</label>
-          <div style="display:flex;flex-direction:column;gap:2px;border-radius:var(--rsm);border:.5px solid var(--border2);overflow:hidden" id="actieplan-wrapper"></div>
+          <div style="display:flex;flex-direction:column;gap:2px;border-radius:var(--rsm);border:.5px solid var(--border2)" id="actieplan-wrapper"></div>
         </div>
         <div class="fg"><label>Opmerkingen</label><textarea id="f-notes" placeholder="Vrije beschrijving, analyse, lessen..." style="min-height:80px;resize:vertical;font-family:inherit;font-size:13px"></textarea></div>
         <div class="btn-row">
-          <button class="btn btn-secondary" onclick="clearForm()">✕ Wissen</button>
-          <button class="btn btn-primary" onclick="saveTrade()">✓ Trade opslaan</button>
+          <button type="button" class="btn btn-secondary" ontouchend="event.preventDefault();clearForm()" onclick="clearForm()">✕ Wissen</button>
+          <button type="button" class="btn btn-primary" ontouchend="event.preventDefault();saveTrade()" onclick="saveTrade()">✓ Trade opslaan</button>
         </div>
       </div>
     </div>
@@ -631,6 +641,14 @@ input[type=range]{accent-color:var(--green);width:100%}
         <p style="font-size:11px;color:var(--text3);margin-bottom:10px">Stel in hoeveel USD 1R waard is per periode. Trades worden automatisch berekend met de geldende risk op hun datum.</p>
         <div id="risk-entries-list"></div>
         <button onclick="addRiskEntry()" style="margin-top:8px;font-size:12px;padding:6px 12px;border-radius:var(--rsm);border:.5px solid var(--border2);background:transparent;color:var(--green);cursor:pointer">+ Periode toevoegen</button>
+      </div>
+
+      <!-- Actieplan regels -->
+      <div class="card">
+        <div class="ct">Actieplan regels beheren</div>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:14px">Voeg actieplan regels toe of verwijder ze. Bestaande trade-data (✓/✗ per regel) blijft behouden op basis van regelpositie.</p>
+        <div id="rules-manage-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+        <button onclick="addRuleEntry()" style="font-size:13px;padding:9px 16px;border:.5px solid var(--green);border-radius:var(--rsm);background:transparent;color:var(--green);cursor:pointer;width:100%">+ Regel toevoegen</button>
       </div>
 
       <!-- Strategieën -->
@@ -826,9 +844,9 @@ function rebuildStratDropdowns(){
   buildLogFilters();
   buildDashFilters();
 }
-const EMOS = ['Foutloos','Geldige entry niet genomen','Te vroege entry','Te late entry','Stoploss verruimd','SL gecancelled','SL te snel BE','TP te snel','TP te ver','Te grote sharesize','Averaging down','Overmodificatie','Plan losgelaten'];
-const ECOL = {'Foutloos':'#10b981','Geldige entry niet genomen':'#3b82f6','Te vroege entry':'#f59e0b','Te late entry':'#f97316','Stoploss verruimd':'#f43f5e','SL gecancelled':'#dc2626','SL te snel BE':'#ec4899','TP te snel':'#8b5cf6','TP te ver':'#6366f1','Te grote sharesize':'#f43f5e','Averaging down':'#b91c1c','Overmodificatie':'#d97706','Plan losgelaten':'#9f1239'};
-const ESHORT = {'Foutloos':'Foutloos','Geldige entry niet genomen':'Entry niet genomen','Te vroege entry':'Te vroeg (FOMO)','Te late entry':'Te laat','Stoploss verruimd':'SL verruimd','SL gecancelled':'SL gecancelled','SL te snel BE':'SL→BE te snel','TP te snel':'TP te snel','TP te ver':'TP te ver','Te grote sharesize':'Te grote size','Averaging down':'Averaging down','Overmodificatie':'Overmodificatie','Plan losgelaten':'Plan losgelaten'};
+const EMOS = ['Foutloos','Geldige entry niet genomen','Te vroege entry','Te late entry','Stoploss verruimd','SL gecancelled','SL te snel BE','TP te snel','TP te ver','Te grote sharesize','Averaging down','Overmodificatie','Plan losgelaten','Revenge trade','Overtraden','Niet bijgehouden setup'];
+const ECOL = {'Foutloos':'#10b981','Geldige entry niet genomen':'#3b82f6','Te vroege entry':'#f59e0b','Te late entry':'#f97316','Stoploss verruimd':'#f43f5e','SL gecancelled':'#dc2626','SL te snel BE':'#ec4899','TP te snel':'#8b5cf6','TP te ver':'#6366f1','Te grote sharesize':'#f43f5e','Averaging down':'#b91c1c','Overmodificatie':'#d97706','Plan losgelaten':'#9f1239','Revenge trade':'#7f1d1d','Overtraden':'#92400e','Niet bijgehouden setup':'#1e3a5f'};
+const ESHORT = {'Foutloos':'Foutloos','Geldige entry niet genomen':'Entry niet genomen','Te vroege entry':'Te vroeg (FOMO)','Te late entry':'Te laat','Stoploss verruimd':'SL verruimd','SL gecancelled':'SL gecancelled','SL te snel BE':'SL→BE te snel','TP te snel':'TP te snel','TP te ver':'TP te ver','Te grote sharesize':'Te grote size','Averaging down':'Averaging down','Overmodificatie':'Overmodificatie','Plan losgelaten':'Plan losgelaten','Revenge trade':'Revenge trade','Overtraden':'Overtraden','Niet bijgehouden setup':'Setup niet bijgehouden'};
 const DAYS = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
 
 // ============================================================
@@ -1281,6 +1299,15 @@ function litStars(n){
   if(lbl) lbl.textContent = n>0?(STAR_LABELS[n]||''):'Geen beoordeling';
 }
 
+function togglePnlSign(){
+  const inp = document.getElementById('f-pnl');
+  const btn = document.getElementById('pnl-sign-btn');
+  const v = inp.value.replace(',','.');
+  const n = parseFloat(v) || 0;
+  inp.value = n === 0 ? '' : String(-n).replace('.',',');
+  btn.style.color = inp.value.startsWith('-') ? 'var(--red)' : 'var(--text2)';
+  onPnlChange(inp);
+}
 function toggleEmo(el){ el.classList.toggle('sel'); }
 
 function setDir(d){
@@ -1376,7 +1403,7 @@ function go(t){
   });
   if(t==='log')    renderLog();
   if(t==='dash')   renderDash();
-  if(t==='beheer') renderStratManage();
+  if(t==='beheer') { renderStratManage(); renderRulesManage(); }
   document.querySelector('.content').scrollTop = 0;
 }
 
@@ -2665,8 +2692,8 @@ function _renderRulesInto(wrapperId, stateObj, toggleFn){
     const gc = good?'var(--green)':'var(--border2)';
     const bc = bad ?'var(--red)' :'var(--border2)';
     return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${bg}">
-      <button onclick="${toggleFn}('${r.id}',1)" style="width:26px;height:26px;border-radius:50%;border:1.5px solid ${gc};background:${good?'rgba(16,185,129,.25)':'transparent'};color:${good?'var(--green)':'var(--text3)'};cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">✓</button>
-      <button onclick="${toggleFn}('${r.id}',-1)" style="width:26px;height:26px;border-radius:50%;border:1.5px solid ${bc};background:${bad?'rgba(244,63,94,.25)':'transparent'};color:${bad?'var(--red)':'var(--text3)'};cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">✗</button>
+      <button type="button" onclick="${toggleFn}('${r.id}',1)" ontouchend="event.preventDefault();${toggleFn}('${r.id}',1)" style="width:44px;height:44px;border-radius:50%;border:1.5px solid ${gc};background:${good?'rgba(16,185,129,.25)':'transparent'};color:${good?'var(--green)':'var(--text3)'};cursor:pointer;font-size:16px;touch-action:manipulation;-webkit-tap-highlight-color:transparent">✓</button>
+      <button type="button" onclick="${toggleFn}('${r.id}',-1)" ontouchend="event.preventDefault();${toggleFn}('${r.id}',-1)" style="width:44px;height:44px;border-radius:50%;border:1.5px solid ${bc};background:${bad?'rgba(244,63,94,.25)':'transparent'};color:${bad?'var(--red)':'var(--text3)'};cursor:pointer;font-size:16px;touch-action:manipulation;-webkit-tap-highlight-color:transparent">✗</button>
       <span style="font-size:12px;color:${good?'var(--green)':bad?'var(--red)':'var(--text2)'}"><b>${r.label}</b> — ${r.desc}</span>
     </div>`;
   }).join('');
@@ -2681,6 +2708,68 @@ function toggleEditRule(id,val){ editRuleState[id]=editRuleState[id]===val?0:val
 function resetRules(){ RULES.forEach(r=>ruleState[r.id]=0); renderActieplan(); }
 function getRulesArray(){ return RULES.map(r=>ruleState[r.id]); }
 function setRulesFromArray(arr){ RULES.forEach((r,i)=>{ ruleState[r.id]=(arr&&arr[i])||0; }); renderActieplan(); }
+
+// ── Actieplan rules beheer ────────────────────────────────────────────────────
+function saveRulesToStorage(){
+  localStorage.setItem('tj4-rules', JSON.stringify(RULES.map(r=>({id:r.id,label:r.label,desc:r.desc}))));
+}
+
+function renderRulesManage(){
+  const el = document.getElementById('rules-manage-list');
+  if(!el) return;
+  el.innerHTML = RULES.map((r,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:.5px solid var(--border)">
+      <div style="flex:1">
+        <input value="${r.label}" onchange="updateRuleLabel(${i},'label',this.value)"
+          style="font-size:12px;font-weight:600;background:transparent;border:none;border-bottom:.5px solid var(--border2);color:var(--text);width:80px;padding:2px 4px">
+        <input value="${r.desc}" onchange="updateRuleLabel(${i},'desc',this.value)"
+          style="font-size:12px;background:transparent;border:none;border-bottom:.5px solid var(--border2);color:var(--text2);width:calc(100% - 90px);padding:2px 4px;margin-left:6px">
+      </div>
+      <button onclick="removeRule(${i})" title="Verwijderen" style="background:none;border:.5px solid var(--border2);color:var(--red);border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;flex-shrink:0">×</button>
+    </div>`).join('');
+}
+
+function updateRuleLabel(i, field, val){
+  if(!RULES[i]) return;
+  RULES[i][field] = val;
+  saveRulesToStorage();
+  renderActieplan();
+  renderEditActieplan();
+}
+
+function addRuleEntry(){
+  const idx = RULES.length + 1;
+  const newRule = {id:'rule'+Date.now(), label:'Regel '+idx, desc:'Omschrijving...'};
+  RULES.push(newRule);
+  ruleState[newRule.id] = 0;
+  editRuleState[newRule.id] = 0;
+  saveRulesToStorage();
+  renderRulesManage();
+  renderActieplan();
+  renderEditActieplan();
+}
+
+function removeRule(i){
+  if(RULES.length <= 1){ alert('Minimaal 1 regel vereist.'); return; }
+  if(!confirm(`Regel "${RULES[i].label}" verwijderen? Trade-data op deze positie blijft bewaard maar wordt niet meer getoond.`)) return;
+  const removed = RULES.splice(i, 1)[0];
+  delete ruleState[removed.id];
+  delete editRuleState[removed.id];
+  saveRulesToStorage();
+  renderRulesManage();
+  renderActieplan();
+  renderEditActieplan();
+}
+
+function loadRulesFromStorage(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('tj4-rules')||'[]');
+    if(saved.length > 0){
+      RULES.length = 0;
+      saved.forEach(r=>{ RULES.push(r); ruleState[r.id]=0; editRuleState[r.id]=0; });
+    }
+  } catch(e){}
+}
 function getEditRulesArray(){ return RULES.map(r=>editRuleState[r.id]); }
 function setEditRulesFromArray(arr){ RULES.forEach((r,i)=>{ editRuleState[r.id]=(arr&&arr[i])||0; }); renderEditActieplan(); }
 
@@ -3121,7 +3210,9 @@ function parseBrokerData(text){
         avgEntry:Math.round(avgEntry*10000)/10000,
         avgExit :Math.round(avgExit*10000)/10000,
         pnl:totalNet, partials:closes.length,
-        imported:false
+        imported:false,
+        _closes: closes.map(c=>({qty:c.qty, price:c.price, net:c.net})),
+        _uid: ticker+'_'+opens[0].date+'_'+opens[0].time+'_'+Math.round(Math.random()*1e9)
       });
       currentRows=[];
     };
@@ -3218,7 +3309,7 @@ function renderBrokerResult(){
       <div id="${groupId}">
         ${trades.map((t,li)=>{
           const done=t.imported;
-          const i=t._idx;
+          const uid=t._uid||Math.random();
           const bg=done?'rgba(0,0,0,.15)':'var(--bg3)';
           const op=done?'opacity:0.45;':'';
           return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:${bg};border-top:.5px solid var(--border);${op}">
@@ -3237,9 +3328,9 @@ function renderBrokerResult(){
                 ${t.pnl>=0?'+':''}$${fmt(Math.abs(t.pnl),2)}
               </span>
               ${done
-                ? `<button onclick="reEnableBrokerImport(${i})" title="Opnieuw importeren" style="font-size:10px;padding:3px 8px;background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:var(--rsm);cursor:pointer">↺</button>`
-                : `<button onclick="importBrokerTrade(${i})" style="font-size:11px;padding:5px 10px;background:var(--green);color:#fff;border:none;border-radius:var(--rsm);cursor:pointer;white-space:nowrap">Importeren →</button>`}
-              <button onclick="dismissBrokerRow(${i})" title="Verwijder" style="background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
+                ? `<button onclick="reEnableBrokerImport('${uid}')" title="Opnieuw importeren" style="font-size:10px;padding:3px 8px;background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:var(--rsm);cursor:pointer">↺</button>`
+                : `<button onclick="importBrokerTrade('${uid}')" style="font-size:11px;padding:5px 10px;background:var(--green);color:#fff;border:none;border-radius:var(--rsm);cursor:pointer;white-space:nowrap">Importeren →</button>`}
+              <button onclick="dismissBrokerRow('${uid}')" title="Verwijder" style="background:none;border:.5px solid var(--border2);color:var(--text3);border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
             </div>
           </div>`;
         }).join('')}
@@ -3260,8 +3351,8 @@ function toggleBrokerGroup(id){
 }
 
 
-function importBrokerTrade(i){
-  const t=(window._brokerParsed||[])[i]; if(!t) return;
+function importBrokerTrade(uid){
+  const t=(window._brokerParsed||[]).find(t=>t._uid===uid); if(!t) return;
   try{
     const hist=JSON.parse(localStorage.getItem('tj4-broker-history')||'[]');
     if(!hist.find(h=>h.ticker===t.ticker&&h.date===t.date&&h.time===t.time)) hist.push(t);
@@ -3277,30 +3368,38 @@ function importBrokerTrade(i){
     const risk=getRiskForDate(t.date);
     if(risk>0) document.getElementById('f-ru').value=String(Math.round(t.pnl/risk*100)/100).replace('.',',');
     setDir(t.dir);
-    document.getElementById('f-notes').value=`Import: ${typeof fmtQty==='function'?fmtQty(t.qty):t.qty}× ${t.ticker} ${t.dir}\nEntry: $${fmt(t.avgEntry,4)} → Exit: $${fmt(t.avgExit,4)} (${t.partials} deelsluitingen)`;
+    // Build detailed notes with each partial close listed separately
+    const partialLines = (t._closes||[]).map((c,i)=>{
+      const pnlStr = (c.net>=0?'+':'')+'$'+fmt(Math.abs(c.net),2);
+      const priceStr = '$'+fmt(c.price,2);
+      return `  ${i+1}. ${fmtQty(c.qty)}× @ ${priceStr}  →  ${pnlStr}`;
+    }).join('\n');
+    const notesText = [
+      `Import: ${fmtQty(t.qty)}× ${t.ticker} ${t.dir}`,
+      `Entry:  $${fmt(t.avgEntry,2)}`,
+      ``,
+      `Deelsluitingen (${t.partials}):`,
+      partialLines || `  Exit: $${fmt(t.avgExit,2)}`
+    ].join('\n');
+    document.getElementById('f-notes').value=notesText;
     document.querySelector('.content').scrollTop=300;
     const card=document.getElementById('f-ticker').closest('.card');
     if(card){card.style.boxShadow='0 0 0 2px var(--green)';setTimeout(()=>card.style.boxShadow='',1500);}
     // Mark as imported and refresh broker result list
-    if(window._brokerParsed&&window._brokerParsed[i]) window._brokerParsed[i].imported=true;
+    if(t) t.imported=true;
     renderBrokerResult();
   },150);
 }
 
-function dismissBrokerRow(i){
-  if(window._brokerParsed&&window._brokerParsed[i]){
-    window._brokerParsed.splice(i,1);
-    renderBrokerResult();
-  }
+function dismissBrokerRow(uid){
+  if(!window._brokerParsed) return;
+  window._brokerParsed = window._brokerParsed.filter(t=>t._uid!==uid);
+  renderBrokerResult();
 }
 
-// Re-import: mark isImported=false so the row becomes active again
-// Called from history popup or when a trade was deleted from log
-function reEnableBrokerImport(i){
-  if(window._brokerParsed&&window._brokerParsed[i]){
-    window._brokerParsed[i].imported=false;
-    renderBrokerResult();
-  }
+function reEnableBrokerImport(uid){
+  const t=(window._brokerParsed||[]).find(t=>t._uid===uid);
+  if(t){ t.imported=false; renderBrokerResult(); }
 }
 
 function showBrokerHistory(){
@@ -3632,6 +3731,11 @@ let popupEqTickers = false;
 function openChartModal(chartId, title){
   document.getElementById('chart-popup-title').innerHTML = title+' <button class="modal-close" onclick="closeChartPopup()">×</button>';
   document.getElementById('chart-popup-filters').style.display='none';
+
+  // Always restore the canvas (other popups replace .cw innerHTML with text)
+  if(popupChart){ popupChart.destroy(); popupChart=null; }
+  document.querySelector('#chart-popup .cw').innerHTML='<canvas id="c-popup"></canvas>';
+
   document.getElementById('chart-popup').style.display='flex';
 
   const filtersEl = document.getElementById('chart-popup-filters');
@@ -3645,7 +3749,6 @@ function openChartModal(chartId, title){
   } else {
     filtersEl.style.display = 'none';
     const src = document.getElementById(chartId);
-    if(popupChart) popupChart.destroy();
     if(src && src._chart){ popupChart = cloneChart(src._chart); }
   }
 }
@@ -3671,7 +3774,12 @@ function renderPopupEquity(){
     if(cut) arr = arr.filter(t=>dateOf(t)>=cut);
   }
   arr = arr.sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
-  if(popupChart) popupChart.destroy();
+  if(popupChart){ popupChart.destroy(); popupChart=null; }
+  // Always ensure the canvas exists (other popups replace .cw with text content)
+  const cwEl = document.querySelector('#chart-popup .cw');
+  if(cwEl && !document.getElementById('c-popup')){
+    cwEl.innerHTML='<canvas id="c-popup"></canvas>';
+  }
   if(!arr.length) return;
   let cum = 0;
   const labels = arr.map(t=>popupEqTickers ? t.ticker+' '+fmtDate(t.date) : fmtDate(t.date));
@@ -3687,7 +3795,12 @@ function renderPopupEquity(){
   });
 }
 
-function closeChartPopup(e){ if(!e||e.target===document.getElementById('chart-popup')){ document.getElementById('chart-popup').style.display='none'; } }
+function closeChartPopup(e){ if(!e||e.target===document.getElementById('chart-popup')){
+  document.getElementById('chart-popup').style.display='none';
+  if(popupChart){ popupChart.destroy(); popupChart=null; }
+  const cwEl=document.querySelector('#chart-popup .cw');
+  if(cwEl) cwEl.innerHTML='<canvas id="c-popup"></canvas>';
+} }
 function cloneChart(c){
   return new Chart(document.getElementById('c-popup'),{ type:c.config.type, data:JSON.parse(JSON.stringify(c.config.data)), options:JSON.parse(JSON.stringify(c.config.options||{})) });
 }
@@ -4923,6 +5036,7 @@ function exportCSV(){
 // ============================================================
 buildLogFilters();
 buildDashFilters();
+loadRulesFromStorage();
 renderActieplan();
 rebuildStratDropdowns();
 renderLog(); // show empty state immediately
