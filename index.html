@@ -943,11 +943,10 @@ function rowToTrade(r){
     stars: r.stars||0,
     emos: r.emos||[], link: r.link||'',
     images: r.images||[], bt: r.bt||{},
-    notes: r.notes||''
+    notes: r.notes||'',
+    rules: r.rules||[]
   };
 }
-
-// Migrate local trade object → DB row
 function tradeToRow(t){
   return {
     date: t.date, time: t.time,
@@ -959,7 +958,8 @@ function tradeToRow(t){
     stars: t.stars||0,
     emos: t.emos||[], link: t.link||'',
     images: t.images||[], bt: t.bt||{},
-    notes: t.notes||''
+    notes: t.notes||'',
+    rules: t.rules||[]
   };
 }
 
