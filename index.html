@@ -2973,19 +2973,24 @@ function renderGedragStats(all){
 
     <!-- Efficiency bar -->
     <div style="margin-bottom:16px">
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">EFFICIENCY VERDELING</div>
-      <div style="display:flex;height:20px;border-radius:4px;overflow:hidden;gap:1px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">EFFICIENCY VERDELING <span style="font-weight:400;opacity:.6">(klik op een balk)</span></div>
+      <div style="display:flex;height:28px;border-radius:4px;overflow:hidden;gap:1px">
         ${(()=>{
           const buckets=[
-            {label:'<0%',  color:'#7f1d1d', count:tpTrades.filter(t=>(t.bt.efficiency||0)<0).length},
-            {label:'0-50%',color:'var(--red)', count:tpTrades.filter(t=>(t.bt.efficiency||0)>=0&&(t.bt.efficiency||0)<50).length},
-            {label:'50-80%',color:'var(--amber)', count:tpTrades.filter(t=>(t.bt.efficiency||0)>=50&&(t.bt.efficiency||0)<80).length},
-            {label:'80-100%',color:'var(--green)', count:tpTrades.filter(t=>(t.bt.efficiency||0)>=80&&(t.bt.efficiency||0)<100).length},
-            {label:'>100%',color:'#065f46', count:tpTrades.filter(t=>(t.bt.efficiency||0)>=100).length},
-          ].filter(b=>b.count>0);
+            {label:'Onder 0%',  color:'#7f1d1d', trades:tpTrades.filter(t=>(t.bt.efficiency||0)<0)},
+            {label:'0–50%',     color:'var(--red)', trades:tpTrades.filter(t=>(t.bt.efficiency||0)>=0&&(t.bt.efficiency||0)<50)},
+            {label:'50–80%',    color:'var(--amber)', trades:tpTrades.filter(t=>(t.bt.efficiency||0)>=50&&(t.bt.efficiency||0)<80)},
+            {label:'80–100%',   color:'var(--green)', trades:tpTrades.filter(t=>(t.bt.efficiency||0)>=80&&(t.bt.efficiency||0)<100)},
+            {label:'Boven 100%',color:'#065f46', trades:tpTrades.filter(t=>(t.bt.efficiency||0)>=100)},
+          ].filter(b=>b.trades.length>0);
           return buckets.map(b=>{
-            const pct=Math.round(b.count/tpTrades.length*100);
-            return `<div title="${b.label}: ${b.count}× (${pct}%)" style="width:${pct}%;background:${b.color};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;min-width:${pct>8?'0':'0'}px">${pct>=10?b.label:''}</div>`;
+            const pct=Math.round(b.trades.length/tpTrades.length*100);
+            const idxArr='['+b.trades.map(t=>trades.indexOf(t)).join(',')+']';
+            return `<div onclick="openEfficiencyPopup(${JSON.stringify(b.label)},${JSON.stringify(b.color)},${idxArr})"
+              title="${b.label}: ${b.trades.length}× (${pct}%) — klik voor detail"
+              onmouseenter="this.style.opacity='.75'" onmouseleave="this.style.opacity='1'"
+              style="width:${pct}%;background:${b.color};display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;cursor:pointer"
+            >${pct>=10?b.label+' '+pct+'%':''}</div>`;
           }).join('');
         })()}
       </div>
@@ -3009,6 +3014,53 @@ function renderGedragStats(all){
       </button>
     </div>`:''}
   `;
+}
+
+function openEfficiencyPopup(label, color, idxArr){
+  const bucketTrades = (idxArr||[]).map(i=>trades[i]).filter(Boolean);
+  if(!bucketTrades.length) return;
+  const sorted = bucketTrades.slice().sort((a,b)=>(a.bt.efficiency||0)-(b.bt.efficiency||0));
+  const totalMissed = Math.round(sorted.reduce((s,t)=>s+(t.bt.missedPnl||0),0)*100)/100;
+  const avgEff = Math.round(sorted.reduce((s,t)=>s+(t.bt.efficiency||0),0)/sorted.length);
+
+  document.getElementById('chart-popup-filters').style.display='none';
+  document.getElementById('chart-popup-title').innerHTML=
+    `<span style="display:inline-flex;align-items:center;gap:8px">
+      <span style="width:12px;height:12px;background:${color};border-radius:3px;display:inline-block"></span>
+      Efficiency: ${label}
+    </span>
+    <button class="modal-close" onclick="closeChartPopup()">×</button>`;
+
+  document.querySelector('#chart-popup .cw').innerHTML=`
+    <div style="padding:4px 0 12px;display:flex;gap:16px;font-size:12px;color:var(--text3);border-bottom:.5px solid var(--border);margin-bottom:10px">
+      <span>${sorted.length} trade${sorted.length!==1?'s':''}</span>
+      <span>gem. efficiency: <b style="color:var(--text)">${avgEff}%</b></span>
+      ${totalMissed>0?`<span>totaal gemist: <b style="color:var(--red)">+$${fmt(totalMissed,2)}</b></span>`:''}
+    </div>
+    ${sorted.map(t=>{
+      const idx=trades.indexOf(t);
+      const eff=t.bt.efficiency||0;
+      const effColor=eff<0?'#ef4444':eff<50?'var(--red)':eff<80?'var(--amber)':eff<100?'var(--green)':'#065f46';
+      return `<div onclick="openTradeDetail(${idx});closeChartPopup()"
+        style="display:grid;grid-template-columns:56px 1fr auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:.5px solid var(--border);cursor:pointer">
+        <div style="font-size:20px;font-weight:800;color:${effColor};text-align:right">${eff}%</div>
+        <div>
+          <span style="font-weight:600;color:var(--text)">${t.ticker}</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:6px">${t.dir} · ${fmtDate(t.date,true)} ${t.time||''}</span>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">
+            ${t.bt.activeTP?`TP $${fmt(t.bt.activeTP,2)} · R:R 1:${fmt(t.bt.plannedRR||0,1)}`:''}
+          </div>
+        </div>
+        <div style="text-align:right;font-size:12px">
+          <div style="font-weight:700;color:${+t.pnl>=0?'var(--green)':'var(--red)'}">${+t.pnl>=0?'+':''}$${fmt(Math.abs(+t.pnl),2)}</div>
+          <div style="color:var(--text3);font-size:10px">${fmt(+t.ru||0,2)}R</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:var(--text3)">
+          ${(t.bt.missedPnl||0)>0?`<div style="color:var(--red)">+$${fmt(t.bt.missedPnl,2)} gemist</div><div>${fmt(t.bt.missedRU||0,2)}R</div>`:''}
+        </div>
+      </div>`;
+    }).join('')}`;
+  document.getElementById('chart-popup').style.display='flex';
 }
 
 function renderActieplanStats(all){
@@ -3394,10 +3446,12 @@ function parseOrderHistory(text){
     const status    = (c[2]||'').trim();                 // Filled/Cancelled/Modified/Created
     const orderID   = (c[3]||'').trim();
     const type      = (c[4]||'').trim();                 // Market/Stop loss/Take profit/Tr. stop loss
-    const price     = parseNum(c[5]||'');
+    const rawPrice  = parseNum(c[5]||'');
     const qty       = parseQty(c[6]||'');
     const dtRaw     = (c[7]||'').trim();
     const stopPrice = parseNum(c[8]||'');
+    // Filled Stop orders: execution price is in stopPrice col (col 8), price col is empty
+    const price     = rawPrice > 0 ? rawPrice : stopPrice;
 
     if(!ticker||!/^[A-Z]{1,8}$/.test(ticker)) return null;
     if(!dtRaw) return null;
@@ -3493,7 +3547,7 @@ function parseOrderHistory(text){
       const tradeStart = opens[0].dt;
       const tradeEnd   = closes[closes.length-1].dt;
       const slRows = sorted.filter(r=>
-        /stop loss|tr\. stop loss|trailing stop/i.test(r.type) &&
+        /stop loss|tr\.? stop loss|trailing stop|^stop$|^tr\. stop loss$/i.test(r.type) &&
         r.dt >= tradeStart && r.dt <= tradeEnd &&
         (r.stopPrice>0||r.price>0)
       );
@@ -3502,13 +3556,20 @@ function parseOrderHistory(text){
       const totalRisk    = riskPerShare ? Math.round(riskPerShare*matchQty*100)/100 : null;
 
       // TP: take profit orders within this trade's time window
+      // Broker may label TP as 'Take profit' OR as 'Limit' order above/below entry
       const tpSide = currentDir==='Long' ? 'sell' : 'buy';
-      const tpRows = sorted.filter(r=>
-        r.side===tpSide &&
-        /take profit/i.test(r.type) &&
-        r.dt >= tradeStart && r.dt <= tradeEnd &&
-        r.price>0
-      );
+      const tpRows = sorted.filter(r=>{
+        if(r.side!==tpSide) return false;
+        if(r.dt < tradeStart || r.dt > tradeEnd) return false;
+        if(r.price<=0) return false;
+        // Explicit take profit label
+        if(/take profit/i.test(r.type)) return true;
+        // Limit order in favorable direction (TP for Long = sell above entry, Short = buy below entry)
+        if(/^limit$/i.test(r.type)){
+          return currentDir==='Long' ? r.price > avgEntry : r.price < avgEntry;
+        }
+        return false;
+      });
       const initialTP    = tpRows.length ? tpRows[0].price : null;
       const activeTpRows = tpRows.filter(r=>!/cancelled/i.test(r.status));
       const activeTP     = activeTpRows.length ? activeTpRows[activeTpRows.length-1].price : initialTP;
@@ -4310,7 +4371,11 @@ Wees specifiek, gebruik de exacte cijfers uit de data. Wees eerlijk maar constru
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
       body: JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:1500,
@@ -4318,6 +4383,17 @@ Wees specifiek, gebruik de exacte cijfers uit de data. Wees eerlijk maar constru
       })
     });
     const data = await resp.json();
+    if(!resp.ok){
+      const errMsg = data.error?.message || JSON.stringify(data);
+      content.innerHTML=`<div style="color:var(--red);padding:20px">
+        <b>API fout (${resp.status}):</b><br>${errMsg}
+        ${resp.status===401?'<br><br>⚠️ API key vereist. De AI analyse werkt alleen vanuit claude.ai als artifact, niet vanuit GitHub Pages.':''}
+        ${resp.status===403?'<br><br>⚠️ CORS geblokkeerd. Gebruik de app via claude.ai.':''}
+      </div>`;
+      btn.disabled=false; btn.textContent='↺ Heranalyseer';
+      status.textContent='';
+      return;
+    }
     const text = (data.content||[]).map(c=>c.text||'').join('');
     content.innerHTML = `<div style="font-size:13px;line-height:1.8;color:var(--text2)">${
       text
