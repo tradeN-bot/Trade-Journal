@@ -870,6 +870,16 @@ let riskEntries = []; // [{date:'2026-01-01', amount:100}]
 let popupChart = null;
 let cEquity=null, cRu=null, cWlb=null, cBt=null, cMissed=null;
 
+// Helper: get backtest exits from bt object (supports both new bt.exits and legacy bt root)
+function getBtExits(t){
+  if(!t || !t.bt) return {};
+  if(t.bt.exits && typeof t.bt.exits==='object') return t.bt.exits;
+  // Legacy: numeric BT_EXITS values stored at bt root
+  const legacy = {};
+  (BT_EXITS||[]).forEach(ex=>{ if(ex in t.bt && typeof t.bt[ex]==='number') legacy[ex]=t.bt[ex]; });
+  return legacy;
+}
+
 const BT_EXITS = ['1R Exit','2R Exit','3R Exit','4R Exit','5R Exit','2R/Trail SL 2m','Trail SL 2m','Trail SL 5m'];
 const DEFAULT_STRATS = ['Break & Retest','Reversal','HOD Break','LOD Break','Dipbuy','VWAP Bounce','ORB','Long op Support','Short in Resistance'];
 let STRATS = (() => { try { const s=localStorage.getItem('tj4-strats'); return s?JSON.parse(s):DEFAULT_STRATS.slice(); } catch(e){ return DEFAULT_STRATS.slice(); } })();
@@ -1056,18 +1066,24 @@ function showSyncStatus(msg){
 }
 
 async function manualSync(){
-  // Push any locally modified trades to Supabase first
-  const unsynced = trades.filter(t=>t._localUpdated);
+  // Push trades without _id (nooit naar Supabase) + lokaal gewijzigde trades
+  const unsynced = trades.filter(t=>t._localUpdated || !t._id);
   if(unsynced.length > 0){
-    showSyncStatus(`⏳ ${unsynced.length} lokale wijzigingen opslaan...`);
+    showSyncStatus(`⏳ ${unsynced.length} trades synchroniseren naar Supabase...`);
     for(const t of unsynced){
-      try { await dbSaveTrade(t); } catch(e){}
+      try { await dbSaveTrade(t); } catch(e){ console.warn('sync fout:', e); }
     }
   }
   // Then reload from Supabase
   await loadFromSupabase();
-  showSyncStatus('✓ Gesynchroniseerd met database');
-  setTimeout(()=>showSyncStatus(''), 2500);
+  const stillUnsynced = trades.filter(t=>!t._id).length;
+  if(stillUnsynced > 0){
+    showSyncStatus('⚠️ '+stillUnsynced+' trade(s) nog niet gesynchroniseerd — voer SQL uit in Supabase');
+    setTimeout(()=>showSyncStatus(''), 8000);
+  } else {
+    showSyncStatus('✓ Volledig gesynchroniseerd met Supabase');
+    setTimeout(()=>showSyncStatus(''), 2500);
+  }
 }
 
 async function persist(){
@@ -1192,9 +1208,37 @@ async function dbSaveTrade(t){
     delete t._localUpdated;
     try { localStorage.setItem('tj4', JSON.stringify(trades)); } catch(e){}
   } catch(e){
-    console.error('dbSaveTrade mislukt, lokaal bewaard:', e);
-    showSyncStatus('⚠️ Offline — lokaal opgeslagen');
-    setTimeout(()=>showSyncStatus(''), 3000);
+    // Progressive retry: strip optional columns until Supabase accepts it
+    const optionalCols = ['bt','notes','rules','is_imported'];
+    console.warn('dbSaveTrade eerste poging mislukt:', String(e.message||e).slice(0,80));
+    for(let i = 1; i <= optionalCols.length; i++){
+      const stripped = {...row};
+      optionalCols.slice(0, i).forEach(c => delete stripped[c]);
+      try {
+        if(t._id){
+          await supaFetch('trades?id=eq.'+t._id, {
+            method: 'PATCH', prefer: 'return=minimal',
+            body: JSON.stringify(stripped)
+          });
+        } else {
+          const res2 = await supaFetch('trades', {
+            method: 'POST', prefer: 'return=representation',
+            body: JSON.stringify(stripped)
+          });
+          if(res2 && res2[0]){ t._id = res2[0].id; t._updatedAt = res2[0].updated_at||''; }
+        }
+        delete t._localUpdated;
+        try { localStorage.setItem('tj4', JSON.stringify(trades)); } catch(e2){}
+        const missing = optionalCols.slice(0, i).join(', ');
+        showSyncStatus('⚠️ Trade opgeslagen (ontbrekende kolommen: '+missing+') — voer SQL uit in Supabase');
+        setTimeout(()=>showSyncStatus(''), 7000);
+        return;
+      } catch(e2){
+        console.warn('Retry '+i+' mislukt:', String(e2.message||e2).slice(0,60));
+      }
+    }
+    showSyncStatus('⚠️ Sync mislukt — lokaal opgeslagen. Controleer Supabase.');
+    setTimeout(()=>showSyncStatus(''), 8000);
   }
 }
 
@@ -1859,7 +1903,9 @@ function makeNotesBtn(t){
 }
 
 function makeBtBtn(t, idx){
-  const btEntries = Object.entries(t.bt||{}).filter(([,v])=>typeof v==='number');
+  // Read exits from bt.exits (new) or bt directly (legacy)
+  const btExits = getBtExits(t);
+  const btEntries = Object.entries(btExits).filter(([,v])=>typeof v==='number');
   if(!btEntries.length){
     return `<button class="icon-btn" title="Backtest invullen" onclick="openBt(${idx})" style="color:var(--text3);opacity:.4">📊</button>`;
   }
@@ -2043,7 +2089,7 @@ function tdOpenNewTab(){
   const ruC  = ru>0?'#10b981':ru<0?'#ef4444':'#94a3b8';
   const imgs = (t.images||[]).map((src,i)=>`<div style="margin-bottom:8px;position:relative;display:inline-block;margin-right:8px"><img src="${src}" style="max-height:300px;max-width:100%;border-radius:6px;display:block"></div>`).join('');
   const emos = (t.emos||[]).map(e=>`<span style="background:#1e293b;border-radius:20px;padding:3px 10px;font-size:12px;margin:2px;display:inline-block">${e}</span>`).join('');
-  const btRows = Object.entries(t.bt||{}).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a)
+  const btRows = Object.entries(getBtExits(t)).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a)
     .map(([ex,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1e293b;font-size:13px"><span style="color:#94a3b8">${ex}</span><span style="font-weight:700;color:${v>=0?'#10b981':'#ef4444'}">${v>=0?'+':''}${v.toFixed(2)}R</span></div>`).join('');
 
   const html = `<!DOCTYPE html><html><head><title>${t.ticker} · ${t.date} — Trade Journal</title>
@@ -2121,8 +2167,8 @@ function openTradeDetail(idx, scrollToImg){
     `<span class="pill ${t.dir==='Long'?'pl':'ps'}" style="margin-right:4px">${t.dir==='Long'?'↑':'↓'} ${t.dir}</span>`+
     (t.isPaper?'<span class="pill pp">📄 Paper</span>':'<span class="pill" style="background:var(--bg3);color:var(--text3)">Live</span>');
 
-  // Backtest samenvatting
-  const btEntries = Object.entries(t.bt||{}).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a);
+  // Backtest samenvatting — lees uit bt.exits (nieuw) of bt direct (legacy)
+  const btEntries = Object.entries(getBtExits(t)).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a);
   const bestBt = btEntries.length ? btEntries[0] : null;
 
   document.getElementById('td-grid').innerHTML = `
@@ -2897,12 +2943,26 @@ function extractBtFromNotes(notes){
 async function migrateBtFromNotes(){
   let count = 0;
   for(const t of trades){
-    if(t.bt && Object.keys(t.bt).length>0) continue; // already has bt data
-    const bt = extractBtFromNotes(t.notes||'');
-    if(!bt) continue;
-    t.bt = bt;
-    await dbSaveTrade(t);
-    count++;
+    let changed = false;
+    // Migrate bt.exits: move legacy numeric BT_EXITS values from bt root to bt.exits
+    if(t.bt && !t.bt.exits){
+      const legacyExits = {};
+      BT_EXITS.forEach(ex=>{ if(ex in t.bt && typeof t.bt[ex]==='number') legacyExits[ex]=t.bt[ex]; });
+      if(Object.keys(legacyExits).length){
+        // Move exits to bt.exits, keep gedragsdata at root
+        const newBt = {...t.bt};
+        BT_EXITS.forEach(ex=>delete newBt[ex]);
+        newBt.exits = legacyExits;
+        t.bt = newBt;
+        changed = true;
+      }
+    }
+    // Extract bt analytics from notes if bt is empty
+    if(t.bt && Object.keys(t.bt).length===0 || (t.bt && !t.bt.missedPnl)){
+      const extracted = extractBtFromNotes(t.notes||'');
+      if(extracted){ t.bt = {...(t.bt||{}), ...extracted}; changed = true; }
+    }
+    if(changed){ await dbSaveTrade(t); count++; }
   }
   if(count>0){
     renderDash();
@@ -4419,6 +4479,7 @@ function openBt(i){
   btIdx = i;
   const t = trades[i];
   const bt = t.bt||{};
+  const btExitsForForm = getBtExits(t);
   document.getElementById('bt-form-content').innerHTML = `
     <div style="background:var(--bg3);border-radius:var(--rsm);padding:10px 12px;margin-bottom:12px;font-size:13px">
       <strong>${t.ticker}</strong> ${t.dir} — ${t.date} — Werkelijk: <span style="color:${+t.ru>=0?'var(--green)':'var(--red)'}">${fmtR(+t.ru||0)}</span>
@@ -4426,7 +4487,7 @@ function openBt(i){
     <div class="bt-grid">${BT_EXITS.map(ex=>`
       <div class="bt-cell">
         <div class="bt-label">${ex}</div>
-        <input class="bt-input" type="number" step="0.1" placeholder="-" value="${bt[ex]!==undefined?bt[ex]:''}" data-exit="${ex}">
+        <input class="bt-input" type="number" step="0.1" placeholder="-" value="${btExitsForForm[ex]!==undefined?btExitsForForm[ex]:''}" data-exit="${ex}">
       </div>`).join('')}
     </div>
   `;
@@ -4435,12 +4496,14 @@ function openBt(i){
 
 async function saveBt(){
   if(btIdx<0) return;
-  const bt = {};
+  const exits = {};
   document.querySelectorAll('#bt-form-content .bt-input').forEach(inp=>{
     const v = parseFloat(inp.value);
-    if(!isNaN(v)) bt[inp.dataset.exit] = Math.round(v*100)/100;
+    if(!isNaN(v)) exits[inp.dataset.exit] = Math.round(v*100)/100;
   });
-  trades[btIdx].bt = bt;
+  // Preserve gedragsanalyse data (missedPnl, efficiency, activeTP etc.), only update exits
+  const existing = trades[btIdx].bt||{};
+  trades[btIdx].bt = {...existing, exits};
   showSyncStatus('⏳ Opslaan...');
   try { await dbSaveTrade(trades[btIdx]); } catch(e){ await persist(); }
   showSyncStatus('');
@@ -5298,7 +5361,7 @@ function renderEmoChart(all){
     let missedRU = 0;
     ts.forEach(t=>{
       const actual = +t.ru||0;
-      const btVals = Object.values(t.bt||{}).filter(v=>typeof v==='number');
+      const btVals = Object.values(getBtExits(t)).filter(v=>typeof v==='number');
       if(btVals.length){
         const best = Math.max(...btVals);
         if(best > actual) missedRU += Math.round((best-actual)*100)/100;
@@ -5396,7 +5459,7 @@ function renderPlanCompare(all){
 
 function renderBtChart(all){
   // arr = alleen trades met backtest data (voor de balken)
-  let arr = all.filter(t=>Object.keys(t.bt||{}).length>0);
+  let arr = all.filter(t=>Object.keys(getBtExits(t)).length>0);
   // arrAll = alle gefilterde trades incl. zonder backtest (voor werkelijke RU lijn)
   let arrAll = [...all];
   if(btFilter!=='all'){
@@ -5410,7 +5473,7 @@ function renderBtChart(all){
   }
   const totals = {};
   BT_EXITS.forEach(ex=>{ totals[ex]=[]; });
-  arr.forEach(t=>{ BT_EXITS.forEach(ex=>{ if(t.bt[ex]!==undefined) totals[ex].push(+t.bt[ex]); }); });
+  arr.forEach(t=>{ const exits=getBtExits(t); BT_EXITS.forEach(ex=>{ if(exits[ex]!==undefined) totals[ex].push(+exits[ex]); }); });
   const avgs = BT_EXITS.map(ex=>totals[ex].length ? Math.round(avg(totals[ex])*100)/100 : null);
   if(cBt) cBt.destroy();
   // Werkelijk gem. RU van trades MET backtest data (eerlijke vergelijking)
@@ -5451,7 +5514,7 @@ function renderBtChart(all){
 }
 
 function renderMissedChart(all){
-  let arr = all.filter(t=>Object.keys(t.bt||{}).length>0);
+  let arr = all.filter(t=>Object.keys(getBtExits(t)).length>0);
   if(missedFilter!=='all'){
     if(missedFilter==='Long'||missedFilter==='Short') arr=arr.filter(t=>t.dir===missedFilter);
     else arr=arr.filter(t=>t.strat===missedFilter);
@@ -5469,7 +5532,7 @@ function renderMissedChart(all){
     const s = t.strat||'Onbekend';
     if(!byStrat[s]) byStrat[s]={strat:s,trades:[],totalActual:0,totalBest:0,totalMissed:0,n:0};
     const actual = +t.ru||0;
-    const btVals = Object.values(t.bt||{}).filter(v=>typeof v==='number');
+    const btVals = Object.values(getBtExits(t)).filter(v=>typeof v==='number');
     const best   = btVals.length ? Math.max(...btVals) : null;
     const missed = best!==null ? Math.max(0, Math.round((best-actual)*100)/100) : 0;
     byStrat[s].trades.push({t, actual, best, missed});
@@ -5509,12 +5572,12 @@ function renderMissedChart(all){
 }
 
 function openMissedStratPopup(stratName){
-  let arr = getFilteredTrades().filter(t=>t.strat===stratName && Object.keys(t.bt||{}).length>0);
+  let arr = getFilteredTrades().filter(t=>t.strat===stratName && Object.keys(getBtExits(t)).length>0);
   if(!arr.length) return;
 
   const rows = arr.map(t=>{
     const actual = +t.ru||0;
-    const btVals = Object.entries(t.bt||{}).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a);
+    const btVals = Object.entries(getBtExits(t)).filter(([,v])=>typeof v==='number').sort(([,a],[,b])=>b-a);
     const best   = btVals.length ? btVals[0] : null;
     const missed = best ? Math.max(0, Math.round((best[1]-actual)*100)/100) : 0;
     return {t, actual, best, missed, btVals};
