@@ -3513,7 +3513,7 @@ function parseOrderHistory(text){
     // Filled Stop orders: execution price is in stopPrice col (col 8), price col is empty
     const price     = rawPrice > 0 ? rawPrice : stopPrice;
 
-    if(!ticker||!/^[A-Z]{1,8}$/.test(ticker)) return null;
+    if(!ticker||!/^[A-Z0-9]{1,10}$/.test(ticker)) return null;
     if(!dtRaw) return null;
 
     // Parse date → ISO
@@ -3525,11 +3525,13 @@ function parseOrderHistory(text){
     const timeRaw  = dtRaw.includes(' ') ? dtRaw.split(' ')[1] : '';
     const timePart = timeRaw.slice(0,5); // HH:MM for display
     const isoFull  = isoDate + ' ' + timeRaw; // full HH:MM:SS for sorting
+    // Instrument type (col 9): Equities / Futures / Forex
+    const instrType = (c[9]||'').trim();
     // Exchange: last non-empty column
     const exchange = c.slice(9).map(v=>v.trim()).filter(Boolean).pop() || '';
 
     return {ticker, side, status, orderID, type, price, qty, stopPrice,
-            date: isoDate, time: timePart, dt: isoFull, exchange};
+            date: isoDate, time: timePart, dt: isoFull, exchange, instrType};
   }).filter(Boolean);
 
   if(!rows.length) throw new Error('Geen geldige rijen gevonden.');
@@ -3561,6 +3563,32 @@ function parseOrderHistory(text){
 
     const exchange = (execs.find(r=>r.exchange)||{}).exchange || '';
 
+    // Instrument type for this ticker group
+    const groupInstrType = (execs.find(r=>r.instrType)||{}).instrType || '';
+    const isFutures = /futures/i.test(groupInstrType);
+    const isForex   = /forex/i.test(groupInstrType);
+
+    // Multiplier: NAS100 futures = $20/point, Forex = ×100 (lots→units), Equities = 1
+    // NAS100: 1 contract × price point = $20 gross
+    function getMultiplier(ticker){
+      if(isFutures){
+        const t = ticker.toUpperCase();
+        // Colmex NAS100 is a CFD: $1/point/contract (NOT the CME NQ/MNQ future at $20/point)
+        if(t==='NAS100') return 1;
+        // Real CME futures (if ever used via another broker):
+        if(t==='MNQ'||t==='NQ') return 20;
+        if(t==='ES'||t==='MES') return 50;
+        if(t==='YM'||t==='MYM') return 5;
+        if(t==='RTY'||t==='M2K') return 50;
+        if(t==='CL') return 1000;
+        if(t==='GC') return 100;
+        return 1; // unknown future: no multiplier
+      }
+      if(isForex) return 100; // lots → units (0.64 lot × 100 = 64 XAU)
+      return 1; // equities
+    }
+    const multiplier = getMultiplier(ticker);
+
     // Fee helper (defined per ticker scope)
     function feesForLegs(legs){
       const byOrder = {};
@@ -3569,6 +3597,8 @@ function parseOrderHistory(text){
         if(!byOrder[id]) byOrder[id]={qty:0, exchange:r.exchange||exchange};
         byOrder[id].qty += r.qty;
       });
+      // Futures & Forex: no equity fee formula — fees are 0 (Colmex shows 0,00 in data)
+      if(isFutures||isForex) return 0;
       return Object.values(byOrder).reduce((s,o)=>s+calcExecFee(o.qty,o.exchange),0);
     }
 
@@ -3598,8 +3628,8 @@ function parseOrderHistory(text){
       const totalFees = Math.round((entryFees+exitFees)*100)/100;
 
       const grossPnl = currentDir==='Long'
-        ? Math.round((avgExit-avgEntry)*matchQty*100)/100
-        : Math.round((avgEntry-avgExit)*matchQty*100)/100;
+        ? Math.round((avgExit-avgEntry)*matchQty*multiplier*100)/100
+        : Math.round((avgEntry-avgExit)*matchQty*multiplier*100)/100;
       const calcPnl = Math.round((grossPnl-totalFees)*100)/100;
 
       // SL: look in all sorted rows for this ticker for stop loss orders
@@ -3613,7 +3643,7 @@ function parseOrderHistory(text){
       );
       const initialSL    = slRows.length ? (slRows[0].stopPrice||slRows[0].price) : null;
       const riskPerShare = initialSL ? Math.abs(avgEntry-initialSL) : null;
-      const totalRisk    = riskPerShare ? Math.round(riskPerShare*matchQty*100)/100 : null;
+      const totalRisk    = riskPerShare ? Math.round(riskPerShare*matchQty*multiplier*100)/100 : null;
 
       // TP: take profit orders within this trade's time window
       // Broker may label TP as 'Take profit' OR as 'Limit' order above/below entry
@@ -3639,8 +3669,8 @@ function parseOrderHistory(text){
       let missedPnl=null, missedRU=null, plannedRR=null, efficiency=null;
       if(activeTP!==null && totalRisk){
         const tpPnl = currentDir==='Long'
-          ? Math.round((activeTP-avgEntry)*matchQty*100)/100
-          : Math.round((avgEntry-activeTP)*matchQty*100)/100;
+          ? Math.round((activeTP-avgEntry)*matchQty*multiplier*100)/100
+          : Math.round((avgEntry-activeTP)*matchQty*multiplier*100)/100;
         missedPnl  = Math.round((tpPnl-calcPnl)*100)/100;
         // missedRU: gebruik totalRisk als 1R (niet per-share)
         missedRU   = totalRisk ? Math.round(missedPnl/totalRisk*100)/100 : null;
@@ -3649,10 +3679,10 @@ function parseOrderHistory(text){
       }
 
       const closesDetail = closes.map(r=>{
-        const fee   = calcExecFee(r.qty, r.exchange||exchange);
+        const fee   = (isFutures||isForex) ? 0 : calcExecFee(r.qty, r.exchange||exchange);
         const gross = currentDir==='Long'
-          ? Math.round((r.price-avgEntry)*r.qty*100)/100
-          : Math.round((avgEntry-r.price)*r.qty*100)/100;
+          ? Math.round((r.price-avgEntry)*r.qty*multiplier*100)/100
+          : Math.round((avgEntry-r.price)*r.qty*multiplier*100)/100;
         return {qty:r.qty, price:r.price, net:Math.round((gross-fee)*100)/100, fee};
       });
 
